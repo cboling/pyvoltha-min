@@ -1,0 +1,24 @@
+# Note: Version to the right commented out are the lastest package version
+#       on pypi.org (as ov 7/20/2020) but have not been investigated/tested yet
+#
+PyYAML          == 5.3.1
+Twisted         == 20.3.0
+argparse        == 1.4.0
+arrow           == 0.15.7
+bitstring       == 3.1.7
+confluent-kafka == 0.11.5       # 1.4.2
+docker-py       == 1.10.6
+etcd3           == 0.11.1       # 0.12.0
+future          == 0.18.2
+jsonpatch       == 1.26
+netaddr         == 0.8.0
+pcapy           == 0.11.4
+protobuf        == 3.12.0       # 3.12.2
+python-consul   == 0.6.2        # 1.1.0
+scapy           == 2.4.3
+simplejson      == 3.17.0
+six             == 1.15.0
+structlog       == 20.1.0
+transitions     == 0.8.2
+txaioetcd       == 0.3.0        # 18.10.2
+voltha-protos   == 3.4.1

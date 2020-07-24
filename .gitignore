@@ -1,0 +1,18 @@
+# testing related
+.coverage
+.tox/
+coverage.xml
+nose-results.xml
+test/unit/tmp
+
+# python distribution related
+dist
+*.egg-info
+
+# ide workspace
+.idea
+
+# Virtualenv
+venv-*
+
+*.pyc
