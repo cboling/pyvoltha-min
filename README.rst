@@ -44,22 +44,35 @@ Installation instruction
 Release History
 ---------------
 
-+---------+------------+-----------------------------------------------+
-| Version | Date       | Notes                                         |
-+=========+============+===============================================+
-| v0.0.1  | 2020-07-24 | Initial pypy pre-release available. This is   |
-|         |            | primarily for testing out pip install support |
-|         |            | and is not expected to be useful outside of   |
-|         |            | that.                                         |
-+---------+------------+-----------------------------------------------+
++---------+------------+------------------------------------------------+
+| Version | Date       | Notes                                          |
++=========+============+================================================+
+| v0.0.1  | 2020-07-24 | Initial pypy pre-release available. This is    |
+|         |            | primarily for testing out pip install support  |
+|         |            | and is not expected to be useful outside of    |
+|         |            | that.                                          |
++---------+------------+------------------------------------------------+
+| v0.0.2  | 2020-0x-xx | Cleanup of some low-hanging imports, pylint    |
+|         |            | issues, and known 'unused' ONU adapter alarms. |
+|         |            | Includes some additional IAdapter RPCs that    |
+|         |            | were not ported, but not all missing RPCs.     |
++---------+------------+------------------------------------------------+
 
 Detailed Release History
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-v0.0.1.0 (2020-07-24)
-^^^^^^^^^^^^^^^^^^^^^
+v0.0.1 (2020-07-24)
+^^^^^^^^^^^^^^^^^^^
 
 -  Pre-release equivalent to pyVoltha as of this date but with many ONU
    related packages removed, some initial package upgrades, and some
    work needed to get some basic bit rot cleaned up due to lack of
    attention by the goland developers in keeping pyvoltha in-sync
+
+v0.0.2 (2020-07-??)
+^^^^^^^^^^^^^^^^^^^^^
+
+-  Dropped import of __future__ and six (to some extent)
+-  Removed simple ONU-only device events related to OMCI
+-  Dropped transitions, pcapy, and scapy imports (no longer required)
+-  Added missing 'child_device_lost' IAdapter RPC

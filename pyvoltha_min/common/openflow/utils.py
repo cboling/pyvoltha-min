@@ -560,7 +560,7 @@ def hash_flow_stats(flow):
     for _instruction in flow.instructions:
         _instruction_string += _instruction.SerializeToString()
 
-    hex = md5('{},{},{},{},{},{}'.format(
+    hex = md5('{},{},{},{},{},{}'.format(                           # nosec
         flow.table_id,
         flow.priority,
         flow.flags,

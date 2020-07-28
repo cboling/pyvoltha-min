@@ -107,11 +107,11 @@ show-licenses:
 
 bandit-test:
 	@ echo "Running python security check with bandit on module code"
-	@ (. ${TESTVENVDIR}/bin/activate && pip install bandit && bandit -n 3 -r $(WORKING_DIR)/pyvoltha_min)
+	@ (. ${TESTVENVDIR}/bin/activate && pip install bandit && bandit -n 3 -r $(PACKAGE_DIR))
 
 bandit-test-all: venv bandit-test
 	@ echo "Running python security check with bandit on imports"
-	@ (. ${TESTVENVDIR}/bin/activate && bandit -n 3 -r $(WORKING_DIR)/${VENVDIR})
+	@ (. ${TESTVENVDIR}/bin/activate && bandit -n 3 -r ${VENVDIR})
 
 ######################################################################
 # pylint support

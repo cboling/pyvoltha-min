@@ -223,7 +223,7 @@ class ConfigDataRevision(object):
                 data.SerializeToString()))
         else:
             to_hash = str(hash(data))
-        return md5(to_hash).hexdigest()[:12]
+        return md5(to_hash).hexdigest()[:12]        # nosec
 
 
 class ConfigRevision(object):
@@ -260,7 +260,7 @@ class ConfigRevision(object):
 
     def _hash_content(self):
         # hash is derived from config hash and hashes of all children
-        m = md5('' if self._config is None else self._config._hash)
+        m = md5('' if self._config is None else self._config._hash)        # nosec
         if self._children is not None:
             for child_field in sorted(self._children.keys()):
                 children = self._children[child_field]
