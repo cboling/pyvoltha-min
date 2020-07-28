@@ -17,6 +17,7 @@ SHELL = bash -eu -o pipefail
 
 THIS_MAKEFILE	:= $(abspath $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST)))
 WORKING_DIR		:= $(dir $(THIS_MAKEFILE) )
+PACKAGE_DIR     := $(WORKING_DIR)pyvoltha_min
 VENVDIR			:= venv-pyvoltha-min
 TESTVENVDIR		:= ${VENVDIR}-test
 VENV_BIN		?= virtualenv
@@ -117,10 +118,10 @@ bandit-test-all: venv bandit-test
 
 lint: clean
 	@ echo "Executing pylint"
-	@ . ${TESTVENVDIR}/bin/activate && $(MAKE) pyvoltha-min
+	@ . ${TESTVENVDIR}/bin/activate && $(MAKE) lint-pyvoltha-min
 
 lint-pyvoltha-min:
-	- pylint --rcfile=${WORKING_DIR}.pylintrc ${WORKING_DIR} 2>&1 | tee ${WORKING_DIR}pylint.out.txt
+	- pylint --rcfile=${PACKAGE_DIR}/.pylintrc ${PACKAGE_DIR} 2>&1 | tee ${WORKING_DIR}pylint.out.txt
 	@ echo
 	@ echo "See \"file://${WORKING_DIR}pylint.out.txt\" for lint report"
 	@ echo
