@@ -14,15 +14,15 @@
 # limitations under the License.
 #
 
-# Always prefer setuptools over distutils
-from os import path
-from setuptools import setup, find_packages
-
 # io.open is needed for projects that support Python 2.7
 # It ensures open() defaults to text mode with universal newlines,
 # and accepts an argument to specify the text encoding
 # Python 3 only projects can skip this import
 from io import open
+# Always prefer setuptools over distutils
+from os import path
+
+from setuptools import setup, find_packages
 
 package = 'pyvoltha-min'
 setup_dir = path.dirname(path.abspath(__file__))
@@ -37,16 +37,15 @@ with open(version_file) as version_file:
 
 requirements = open(path.join(setup_dir, "requirements.txt")).read().splitlines()
 required = [line for line in requirements if not line.startswith("-")]
-print("Required is '{}'".format(required))
 
 setup(
     name=package,
     version=version,
-    description='VOLTHA Python support libraries',
+    description='VOLTHA Python OLT Device Adapter support libraries',
     author='Chip Boling',
     author_email='chip@bcsw.net',
     long_description=long_description,
-    long_description_content_type='text/markdown',
+    long_description_content_type='text/x-rst',
     url='https://github.com/cboling/pyvoltha-min',
 
     classifiers=[
@@ -54,7 +53,6 @@ setup(
         'Intended Audience :: Developers',
         'Topic :: Software Development :: Libraries',
         'License :: OSI Approved :: Apache Software License',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',

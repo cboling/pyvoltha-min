@@ -17,16 +17,11 @@
 """
 Some docker related convenience functions
 """
-from __future__ import absolute_import
-from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor
 
 import os
-import socket
+
+from docker import Client
 from structlog import get_logger
-
-from docker import Client, errors
-
 
 docker_socket = os.environ.get('DOCKER_SOCK', 'unix://tmp/docker.sock')
 log = get_logger()

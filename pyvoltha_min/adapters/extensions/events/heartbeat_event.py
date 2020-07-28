@@ -11,9 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import absolute_import
-from voltha_protos.events_pb2 import AlarmEventType, AlarmEventSeverity, AlarmEventCategory
 from adapter_alarms import AlarmBase
+from voltha_protos.events_pb2 import AlarmEventType, AlarmEventSeverity, AlarmEventCategory
 
 
 class HeartbeatAlarm(AlarmBase):

@@ -18,12 +18,12 @@
 Some consul related convenience functions
 """
 
-from __future__ import absolute_import
-from structlog import get_logger
-from consul import Consul
 from random import randint
+
+from consul import Consul
+from structlog import get_logger
+
 from .nethelpers import get_my_primary_local_ipv4
-from six.moves import range
 
 log = get_logger()
 

@@ -11,12 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import absolute_import
-from bitstring import BitArray
 import structlog
-from six.moves import range
+from bitstring import BitArray
 
 log = structlog.get_logger()
+
 
 class IndexPool(object):
     def __init__(self, max_entries, offset):

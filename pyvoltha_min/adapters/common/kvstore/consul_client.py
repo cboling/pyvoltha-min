@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from .kv_client import DEFAULT_TIMEOUT, Event, KVClient, KVPair, RETRY_BACKOFF
-from pyvoltha_min.common.utils.asleep import asleep
-from pyvoltha_min.common.utils.deferred_utils import DeferredWithTimeout, TimeOutError
 from consul import ConsulException
 from consul.twisted import Consul
 from structlog import get_logger
-from twisted.internet.defer import inlineCallbacks, returnValue, Deferred
+from twisted.internet.defer import inlineCallbacks, returnValue
+
+from pyvoltha_min.common.utils.asleep import asleep
+from pyvoltha_min.common.utils.deferred_utils import DeferredWithTimeout, TimeOutError
+from .kv_client import DEFAULT_TIMEOUT, Event, KVClient, KVPair, RETRY_BACKOFF
 
 log = get_logger()
 

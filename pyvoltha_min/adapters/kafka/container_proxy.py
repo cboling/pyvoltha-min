@@ -18,7 +18,6 @@
 The superclass for all kafka proxy subclasses.
 """
 
-from __future__ import absolute_import
 import structlog
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.python import failure
@@ -37,7 +36,7 @@ class KafkaMessagingError(BaseException):
 
 
 @implementer(IComponent)
-class ContainerProxy(object):
+class ContainerProxy:
 
     def __init__(self, kafka_proxy, remote_topic, my_listening_topic):
         self.kafka_proxy = kafka_proxy

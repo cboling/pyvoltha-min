@@ -13,24 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from __future__ import absolute_import
 from copy import copy
 
+import six
+import structlog
 from jsonpatch import JsonPatch
 from jsonpatch import make_patch
+from voltha_protos import meta_pb2
 
-from pyvoltha_min.common.utils.json_format import MessageToDict
 from pyvoltha_min.common.config.config_branch import ConfigBranch
 from pyvoltha_min.common.config.config_event_bus import ConfigEventBus
 from pyvoltha_min.common.config.config_proxy import CallbackType, ConfigProxy
 from pyvoltha_min.common.config.config_rev import is_proto_message, children_fields, \
-    ConfigRevision, access_rights
+    access_rights
 from pyvoltha_min.common.config.config_rev_persisted import PersistedConfigRevision
 from pyvoltha_min.common.config.merge_3way import merge_3way
-from voltha_protos import meta_pb2
-
-import structlog
-import six
+from pyvoltha_min.common.utils.json_format import MessageToDict
 
 log = structlog.get_logger()
 
@@ -42,7 +40,7 @@ def check_access_violation(new_msg, old_msg):
     """Raise ValueError if attempt is made to change a read-only field"""
     access_map = access_rights(new_msg.__class__)
     violated_fields = []
-    for field_name, access in six.iteritems(access_map):
+    for field_name, access in access_map.items():
         if access == meta_pb2.READ_ONLY:
             if getattr(new_msg, field_name) != getattr(old_msg, field_name):
                 violated_fields.append(field_name)
@@ -106,7 +104,7 @@ class ConfigNode(object):
         # separate external children data away from locally stored data
         # based on child_node annotations in protobuf
         children = {}
-        for field_name, field in six.iteritems(children_fields(self._type)):
+        for field_name, field in children_fields(self._type).items():
             field_value = getattr(data, field_name)
             if field.is_container:
                 if field.key:

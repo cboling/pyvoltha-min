@@ -14,24 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-import time
+import codecs
 from uuid import uuid4
 
+import six
 import structlog
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, returnValue, Deferred, \
     DeferredQueue, succeed
+from voltha_protos.inter_container_pb2 import MessageType, Argument, \
+    InterContainerRequestBody, InterContainerMessage, Header, \
+    InterContainerResponseBody, StrType
 from zope.interface import implementer
 
 from pyvoltha_min.common.utils import asleep
 from pyvoltha_min.common.utils.registry import IComponent
 from .kafka_proxy import KafkaProxy, get_kafka_proxy
-from voltha_protos.inter_container_pb2 import MessageType, Argument, \
-    InterContainerRequestBody, InterContainerMessage, Header, \
-    InterContainerResponseBody, StrType
-import six
-import codecs
 
 log = structlog.get_logger()
 
@@ -46,7 +44,7 @@ class KafkaMessagingError(Exception):
 
 
 @implementer(IComponent)
-class IKafkaMessagingProxy(object):
+class IKafkaMessagingProxy:
     _kafka_messaging_instance = None
 
     def __init__(self,
@@ -139,7 +137,17 @@ class IKafkaMessagingProxy(object):
                 # and producers
                 self.stopped = True
                 proxy, self.kafka_proxy = self.kafka_proxy, None
-                d = proxy.stop()
+                queue, self.received_msg_queue = self.received_msg_queue, None
+
+                if queue is not None:
+                    try:
+                        queue.put("bye-bye")
+                    except Exception:
+                        pass
+
+                if proxy is not None:
+                    d = proxy.stop()
+
                 log.debug("Messaging-proxy-stopped.")
 
             except Exception as e:
@@ -167,6 +175,7 @@ class IKafkaMessagingProxy(object):
                 # Scenario #1
                 if topic not in self.topic_target_cls_map:
                     self.topic_target_cls_map[topic] = target_cls
+
             elif target_cls is None and callback is not None:
                 # Scenario #2
                 log.debug("custom-callback", topic=topic,
@@ -179,6 +188,7 @@ class IKafkaMessagingProxy(object):
                 log.warn("invalid-parameters")
 
             returnValue(True)
+
         except Exception as e:
             log.exception("Exception-during-subscription", e=e)
             returnValue(False)
@@ -213,6 +223,7 @@ class IKafkaMessagingProxy(object):
         RETRY_BACKOFF = [0.05, 0.1, 0.2, 0.5, 1, 2, 5]
 
         def _backoff(msg, retries):
+            log.debug('backing-off', retries=retries)
             wait_time = RETRY_BACKOFF[min(retries,
                                           len(RETRY_BACKOFF) - 1)]
             log.info(msg, retry_in=wait_time)
@@ -225,6 +236,7 @@ class IKafkaMessagingProxy(object):
         subscribed = False
         if group_id is None:
             group_id = self.default_group_id
+
         while not subscribed:
             subscribed = yield self._subscribe_group_consumer(group_id, topic,
                                                               callback=callback,
@@ -286,11 +298,13 @@ class IKafkaMessagingProxy(object):
         :param msg: Received message
         :return: None on success, Exception on failure
         """
-        try:
-            log.debug("received-msg", msg=msg)
-            yield self.received_msg_queue.put(msg)
-        except Exception as e:
-            log.exception("Failed-enqueueing-received-message", e=e)
+        if self.received_msg_queue is not None:
+            try:
+                log.debug("received-msg", msg=msg)
+                yield self.received_msg_queue.put(msg)
+
+            except Exception as e:
+                log.exception("Failed-enqueueing-received-message", e=e)
 
     @inlineCallbacks
     def _received_message_processing_loop(self):
@@ -299,14 +313,16 @@ class IKafkaMessagingProxy(object):
         at a time
         :return: None on success, Exception on failure
         """
-        while True:
+        log.debug("entry")
+        while not self.stopped and self.received_msg_queue is not None:
             try:
                 message = yield self.received_msg_queue.get()
-                yield self._process_message(message)
-                if self.stopped:
-                    break
+                if not self.stopped:
+                    yield self._process_message(message)
+
             except Exception as e:
                 log.exception("Failed-dequeueing-received-message", e=e)
+        log.debug("exiting")
 
     def _to_string(self, unicode_str):
         if unicode_str is not None:
@@ -349,7 +365,7 @@ class IKafkaMessagingProxy(object):
 
             request.header.timestamp.GetCurrentTime()
             request_body.rpc = rpc
-            for a, b in six.iteritems(kwargs):
+            for a, b in kwargs.items():
                 arg = Argument()
                 arg.key = a
                 try:
@@ -391,6 +407,7 @@ class IKafkaMessagingProxy(object):
             response_body.success = status
             response.body.Pack(response_body)
             return response
+
         except Exception as e:
             log.exception("formatting-response-failed", header=msg_header,
                           body=msg_body, status=status, e=e)
@@ -409,6 +426,7 @@ class IKafkaMessagingProxy(object):
             log.debug("parsed-response", type=message.header.type, from_topic=message.header.from_topic,
                       to_topic=message.header.to_topic, transaction_id=message.header.id)
             return resp
+
         except Exception as e:
             log.exception("parsing-response-failed", msg=msg, e=e)
             return None
@@ -419,6 +437,8 @@ class IKafkaMessagingProxy(object):
         Default internal method invoked for every batch of messages received
         from Kafka.
         """
+        if self.stopped:
+            returnValue(None)
 
         def _augment_args_with_FromTopic(args, from_topic):
             arg = Argument(key=ARG_FROM_TOPIC)
@@ -441,10 +461,9 @@ class IKafkaMessagingProxy(object):
                 result[arg.key] = arg.value
             return result
 
-        current_time = int(time.time() * 1000)
-        # log.debug("Got Message", message=m)
         try:
             val = m.value()
+            log.debug("Got Message", message=m)
             # val = m.message.value
             # print m.topic
 
@@ -456,7 +475,7 @@ class IKafkaMessagingProxy(object):
 
             #  Check whether we need to process request/response scenario
             if m_topic not in self.topic_target_cls_map:
-                return
+                returnValue(None)
 
             # Process request/response scenario
             message = InterContainerMessage()
@@ -466,28 +485,33 @@ class IKafkaMessagingProxy(object):
                 # Get the target class for that specific topic
                 targetted_topic = self._to_string(message.header.to_topic)
                 msg_body = InterContainerRequestBody()
+
                 if message.body.Is(InterContainerRequestBody.DESCRIPTOR):
                     message.body.Unpack(msg_body)
                 else:
                     log.debug("unsupported-msg", msg_type=type(message.body))
-                    return
+                    returnValue(None)
+
                 if targetted_topic in self.topic_target_cls_map:
                     # Augment the request arguments with the from_topic
                     augmented_args = _augment_args_with_FromTopic(msg_body.args,
                                                         msg_body.reply_to_topic)
                     if augmented_args:
-                        log.debug("message-body-args-present", rpc=msg_body.rpc,
-                                  response_required=msg_body.response_required, reply_to_topic=msg_body.reply_to_topic)
+                        log.info("message-body-args-present", rpc=msg_body.rpc,
+                                 response_required=msg_body.response_required,
+                                 reply_to_topic=msg_body.reply_to_topic)
                         (status, res) = yield getattr(
                             self.topic_target_cls_map[targetted_topic],
                             self._to_string(msg_body.rpc))(
                             **_toDict(augmented_args))
                     else:
-                        log.debug("message-body-args-absent", rpc=msg_body.rpc,
-                                  response_required=msg_body.response_required, reply_to_topic=msg_body.reply_to_topic,)
+                        log.info("message-body-args-absent", rpc=msg_body.rpc,
+                                 response_required=msg_body.response_required,
+                                 reply_to_topic=msg_body.reply_to_topic,)
                         (status, res) = yield getattr(
                             self.topic_target_cls_map[targetted_topic],
                             self._to_string(msg_body.rpc))()
+
                     if msg_body.response_required:
                         response = self._format_response(
                             msg_header=message.header,
@@ -499,14 +523,13 @@ class IKafkaMessagingProxy(object):
                                 response.header.to_topic)
                             self._send_kafka_message(res_topic, response)
 
-                        log.debug("Response-sent",
-                                  to_topic=res_topic)
+                        log.debug("Response-sent", to_topic=res_topic)
+
             elif message.header.type == MessageType.Value("RESPONSE"):
                 trns_id = self._to_string(message.header.id)
                 log.debug('received-response', transaction_id=trns_id)
                 if trns_id in self.transaction_id_deferred_map:
                     resp = self._parse_response(val)
-
                     self.transaction_id_deferred_map[trns_id].callback(resp)
             else:
                 log.error("!!INVALID-TRANSACTION-TYPE!!")
@@ -517,6 +540,7 @@ class IKafkaMessagingProxy(object):
     @inlineCallbacks
     def _send_kafka_message(self, topic, msg):
         if self.kafka_proxy is not None:
+            log.debug('sending', topic=topic, msg=msg)
             try:
                 yield self.kafka_proxy.send_message(topic, msg.SerializeToString())
             except Exception as e:
@@ -542,6 +566,8 @@ class IKafkaMessagingProxy(object):
         :return: Either no response is required, or a response is returned
         via the callback or the response is a tuple of (status, return_cls)
         """
+        if self.stopped:
+            returnValue(None)
         try:
             # Ensure all strings are not unicode encoded
             rpc = self._to_string(rpc)
@@ -556,7 +582,7 @@ class IKafkaMessagingProxy(object):
                     **kwargs)
 
             if request is None:
-                return
+                returnValue(None)
 
             # Add the transaction to the transaction map before sending the
             # request.  This will guarantee the eventual response will be

@@ -12,16 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from __future__ import absolute_import
-from consul import Consul, ConsulException
-from pyvoltha_min.common.utils.asleep import asleep
-from requests import ConnectionError
-from twisted.internet.defer import inlineCallbacks, returnValue
+import codecs
 
 import etcd3
-import structlog
 import six
-import codecs
+import structlog
+from consul import Consul, ConsulException
+from requests import ConnectionError
+from twisted.internet.defer import inlineCallbacks
+
+from pyvoltha_min.common.utils.asleep import asleep
 
 
 class ConsulStore(object):

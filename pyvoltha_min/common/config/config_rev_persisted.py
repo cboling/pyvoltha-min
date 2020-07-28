@@ -17,14 +17,12 @@
 """
 A config rev object that persists itself
 """
-from __future__ import absolute_import
 from bz2 import compress, decompress
 
 import structlog
 from simplejson import dumps, loads
 
 from pyvoltha_min.common.config.config_rev import ConfigRevision, children_fields
-import six
 
 log = structlog.get_logger()
 
@@ -66,7 +64,7 @@ class PersistedConfigRevision(ConfigRevision):
             self.store_config()
 
             children_lists = {}
-            for field_name, children in six.iteritems(self._children):
+            for field_name, children in self._children.items():
                 hashes = [rev.hash for rev in children]
                 children_lists[field_name] = hashes
 
@@ -97,7 +95,7 @@ class PersistedConfigRevision(ConfigRevision):
         children_list = data['children']
         assembled_children = {}
         node = branch._node
-        for field_name, meta in six.iteritems(children_fields(msg_cls)):
+        for field_name, meta in children_fields(msg_cls).items():
             child_msg_cls = tmp_cls_loader(meta.module, meta.type)
             children = []
             for child_hash in children_list[field_name]:
@@ -134,12 +132,4 @@ class PersistedConfigRevision(ConfigRevision):
 
 def tmp_cls_loader(module_name, cls_name):
     # TODO this shall be generalized
-    from voltha.protos import voltha_pb2, health_pb2, adapter_pb2, \
-        logical_device_pb2, device_pb2, openflow_13_pb2, bbf_fiber_base_pb2, \
-        bbf_fiber_traffic_descriptor_profile_body_pb2, \
-        bbf_fiber_tcont_body_pb2, bbf_fiber_gemport_body_pb2, \
-        bbf_fiber_multicast_gemport_body_pb2, \
-        bbf_fiber_multicast_distribution_set_body_pb2, \
-        omci_mib_db_pb2, \
-        omci_alarm_db_pb2
     return getattr(locals()[module_name], cls_name)

@@ -20,14 +20,12 @@ A gateway between the internal event bus and the Kafka publisher proxy
 to publish select topics and messages posted to the Voltha-internal event
 bus toward the external world.
 """
-from __future__ import absolute_import
 import structlog
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.message import Message
 from simplejson import dumps
 
 from pyvoltha_min.common.event_bus import EventBusClient
-import six
 
 log = structlog.get_logger()
 
@@ -61,7 +59,7 @@ class EventBusPublisher(object):
 
     def _setup_subscriptions(self, mappings):
 
-        for event_bus_topic, mapping in six.iteritems(mappings):
+        for event_bus_topic, mapping in mappings.items():
 
             kafka_topic = mapping.get('kafka_topic', None)
 

@@ -17,7 +17,6 @@
 """
 Interface definition for Voltha Adapters
 """
-from __future__ import absolute_import
 from zope.interface import Interface
 
 
@@ -182,6 +181,11 @@ class IAdapterInterface(Interface):
         This call is expected to be non-blocking.
         :param device_id: A voltha.Device.id object.
         :param port: A voltha.Port object
+        """
+
+    def child_device_lost(device_id, onu_id):
+        """
+        Missing
         """
 
     def self_test_device(device):

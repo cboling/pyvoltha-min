@@ -16,16 +16,13 @@
 
 """Setting up proper logging for Voltha"""
 
-from __future__ import absolute_import
-import builtins # bring in python 2 to 3 compat imports: https://python-future.org/imports.html
-
 import json
 import logging
 import logging.config
 from collections import OrderedDict
 
 import structlog
-from structlog.stdlib import BoundLogger, INFO
+from structlog.stdlib import BoundLogger
 
 try:
     from _thread import get_ident as _get_ident

@@ -17,13 +17,12 @@
 """
 Utilities to handle gRPC server and client side code in a Twisted environment
 """
-from __future__ import absolute_import
-import structlog
 from concurrent.futures import Future
+
+import structlog
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred
 from twisted.python.threadable import isInIOThread
-
 
 log = structlog.get_logger()
 

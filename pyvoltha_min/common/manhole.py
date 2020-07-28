@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from __future__ import absolute_import, division
+from __future__ import division
+
 import os
 import rlcompleter
 from pprint import pprint
@@ -25,7 +26,6 @@ from twisted.conch.ssh import keys
 from twisted.cred.checkers import InMemoryUsernamePasswordDatabaseDontUse
 from twisted.cred.portal import Portal
 from twisted.internet import reactor
-from six.moves import range
 
 log = structlog.get_logger()
 

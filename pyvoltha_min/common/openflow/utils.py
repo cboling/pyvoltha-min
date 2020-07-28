@@ -13,11 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from __future__ import absolute_import
-import structlog
-
-from voltha_protos import openflow_13_pb2 as ofp
 from hashlib import md5
+
+import structlog
+from voltha_protos import openflow_13_pb2 as ofp
 
 log = structlog.get_logger()
 

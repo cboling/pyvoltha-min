@@ -17,27 +17,23 @@
 """
 Agent to play gateway between CORE and an adapter.
 """
-from __future__ import absolute_import
 import structlog
-import arrow
 from google.protobuf.message import Message
 from twisted.internet.defer import inlineCallbacks, returnValue
+from voltha_protos.common_pb2 import ID, ConnectStatus, OperStatus
+from voltha_protos.device_pb2 import Device, Ports, Devices
+from voltha_protos.events_pb2 import Event
+from voltha_protos.inter_container_pb2 import StrType, BoolType, IntType, Packet
+from voltha_protos.voltha_pb2 import CoreInstance, EventFilterRuleKey
 
 from .container_proxy import ContainerProxy
-
-from voltha_protos.common_pb2 import ID, ConnectStatus, OperStatus
-from voltha_protos.inter_container_pb2 import StrType, BoolType, IntType, Packet
-from voltha_protos.device_pb2 import Device, Ports, Devices
-from voltha_protos.voltha_pb2 import CoreInstance, EventFilterRuleKey
-from voltha_protos.events_pb2 import Event
-from voltha_protos.events_pb2 import KpiEvent2, KpiEventType, MetricInformation, MetricMetaData
-import six
 
 log = structlog.get_logger()
 
 
 def createSubTopic(*args):
     return '_'.join(args)
+
 
 class CoreProxy(ContainerProxy):
 
@@ -181,7 +177,7 @@ class CoreProxy(ContainerProxy):
 
     def _to_proto(self, **kwargs):
         encoded = {}
-        for k, v in six.iteritems(kwargs):
+        for k, v in kwargs.items():
             if isinstance(v, Message):
                 encoded[k] = v
             elif type(v) == int:
@@ -229,6 +225,20 @@ class CoreProxy(ContainerProxy):
                                 channel_id=channel,
                                 **args)
         returnValue(res)
+
+    # @ContainerProxy.wrap_request(Devices)
+    # @inlineCallbacks
+    # def child_device_lost(self, parent_device_id):
+    #     log.debug("child-device-lost")
+    #     id = ID()
+    #     id.id = parent_device_id
+    #     to_topic = self.get_core_topic(parent_device_id)
+    #     reply_topic = self.get_adapter_topic()
+    #     res = yield self.invoke(rpc="ChildDevicesLost",
+    #                             to_topic=to_topic,
+    #                             reply_topic=reply_topic,
+    #                             device_id=id)
+    #     returnValue(res)
 
     @ContainerProxy.wrap_request(None)
     @inlineCallbacks
@@ -377,7 +387,7 @@ class CoreProxy(ContainerProxy):
 
     @ContainerProxy.wrap_request(None)
     @inlineCallbacks
-    def device_pm_config_update(self, device_pm_config, init=False):
+    def device_pm_config_update(self, device_pm_config, init=False):   # TODO: Core does not have the init parameter
         log.debug("device_pm_config_update")
         b = BoolType()
         b.val = init
@@ -413,10 +423,10 @@ class CoreProxy(ContainerProxy):
 
     @ContainerProxy.wrap_request(None)
     @inlineCallbacks
-    def ports_state_update(self,
-                          device_id,
-                          port_type_filter,
-                          oper_status):
+    def ports_state_update(self,                # TODO: Golang rw-core hdoes not have filter
+                           device_id,
+                           port_type_filter,
+                           oper_status):
         log.debug("ports_state_update", device_id=device_id, oper_status=oper_status)
         id = ID()
         id.id = device_id

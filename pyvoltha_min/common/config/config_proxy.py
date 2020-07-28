@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from __future__ import absolute_import
-import structlog
 from enum import Enum
+
+import structlog
 
 from pyvoltha_min.common.config.config_txn import ConfigTransaction
 

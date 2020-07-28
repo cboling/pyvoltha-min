@@ -18,8 +18,8 @@ best-effort behavior. Omit the flag, or just use the original json_format
 module fot the strict behavior.
 """
 
-from __future__ import absolute_import
 from google.protobuf import json_format
+
 
 class _PatchedPrinter(json_format._Printer):
 

@@ -19,8 +19,8 @@
 Simple component registry to provide centralized access to any registered
 components.
 """
-from __future__ import absolute_import
 from collections import OrderedDict
+
 from zope.interface import Interface
 
 

@@ -18,13 +18,10 @@
 This facade handles kafka-formatted messages from the Core, extracts the kafka
 formatting and forwards the request to the concrete handler.
 """
-from __future__ import absolute_import
 import structlog
 from twisted.internet.defer import inlineCallbacks
 from zope.interface import implementer
-from twisted.internet import reactor
 
-from afkak.consumer import OFFSET_LATEST, OFFSET_EARLIEST
 from pyvoltha_min.adapters.interface import IAdapterInterface
 from voltha_protos.inter_container_pb2 import IntType, InterAdapterMessage, StrType, Error, ErrorCode
 from voltha_protos.device_pb2 import Device, Port, ImageDownload, SimulateAlarmRequest, PmConfigs
@@ -48,7 +45,7 @@ class IDError(BaseException):
 
 
 @implementer(IAdapterInterface)
-class AdapterRequestFacade(object):
+class AdapterRequestFacade:
     """
     Gate-keeper between CORE and device adapters.
 
@@ -290,6 +287,21 @@ class AdapterRequestFacade(object):
 
         return True, self.adapter.disable_port(t.val, p.port_no)
 
+    def child_device_lost(self, deviceId, onu_id, **kwargs):
+        if not deviceId:
+            return False, Error(code=ErrorCode.INVALID_PARAMETER,
+                                reason="device-id")
+        if not onu_id:
+            return False, Error(code=ErrorCode.INVALID_PARAMETER,
+                                reason="onu-id")
+        t = StrType()
+        deviceId.Unpack(t)
+
+        oid = IntType()
+        onu_id.Unpack(oid)
+
+        return True, self.adapter.child_device_lost(t.val, oid.val)
+
     def self_test(self, device, **kwargs):
         return self.adapter.self_test_device(device)
 
@@ -329,7 +341,7 @@ class AdapterRequestFacade(object):
         if groups:
             groups.Unpack(g)
 
-        return (True, self.adapter.update_flows_bulk(d, f, g))
+        return True, self.adapter.update_flows_bulk(d, f, g)
 
     def update_flows_incrementally(self, device, flow_changes, group_changes, **kwargs):
         d = Device()
@@ -346,7 +358,7 @@ class AdapterRequestFacade(object):
         if group_changes:
             group_changes.Unpack(g)
 
-        return (True, self.adapter.update_flows_incrementally(d, f, g))
+        return True, self.adapter.update_flows_incrementally(d, f, g)
 
     def suppress_alarm(self, filter, **kwargs):
         return self.adapter.suppress_alarm(filter)
@@ -361,13 +373,13 @@ class AdapterRequestFacade(object):
         else:
             return False, Error(code=ErrorCode.INVALID_PARAMETERS,
                                 reason="msg-invalid")
-
-        max_retry = 0
-        # NOTE as per VOL-3223 a race condition on ONU_IND_REQUEST may occur,
-        # so if that's the message retry up to 10 times
-        if m.header.type == 6:
-            max_retry = 10
-        return (True, self.adapter.process_inter_adapter_message(m, max_retry=max_retry))
+        log.debug('rx-message', message=m)
+        # max_retry = 0
+        # TODO: NOTE as per VOL-3223 a race condition on ONU_IND_REQUEST may occur,
+        #       so if that's the message retry up to 10 times was the old way to handle
+        #       this.  In tibit adapter, I am pausing 1 second but plan to watch admin_state
+        #       for it to exit PREPROVISIONING and go to ENABLED to indicate 'adopt' was received from core
+        return True, self.adapter.process_inter_adapter_message(m)
 
     def receive_packet_out(self, deviceId, outPort, packet, **kwargs):
         try:
@@ -376,8 +388,7 @@ class AdapterRequestFacade(object):
                 deviceId.Unpack(d_id)
             else:
                 return False, Error(code=ErrorCode.INVALID_PARAMETERS,
-                                    reason="deviceid-invalid")
-
+                                    reason="device-id-invalid")
             op = IntType()
             if outPort:
                 outPort.Unpack(op)

@@ -15,11 +15,11 @@
 #
 # """ ID generation utils """
 
-from __future__ import absolute_import
 from uuid import uuid4
 
 
 BROADCAST_CORE_ID=hex(0xFFFF)[2:]
+
 
 def get_next_core_id(current_id_in_hex_str):
     """

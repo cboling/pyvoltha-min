@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from __future__ import absolute_import
+import etcd3
 from twisted.internet import threads
 
-import etcd3
 
 class TwistedEtcdStore(object):
 

@@ -11,16 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import absolute_import
 import structlog
-from enum import Enum
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.message import Message
 from simplejson import dumps
-
-from pyvoltha_min.common.event_bus import EventBusClient
-from pyvoltha_min.common.config.config_proxy import CallbackType
 from voltha_protos.events_pb2 import ConfigEvent, ConfigEventType
+
+from pyvoltha_min.common.config.config_proxy import CallbackType
+from pyvoltha_min.common.event_bus import EventBusClient
 
 IGNORED_CALLBACKS = [CallbackType.PRE_ADD, CallbackType.GET,
                      CallbackType.POST_LISTCHANGE, CallbackType.PRE_REMOVE,

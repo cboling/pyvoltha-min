@@ -17,13 +17,13 @@
 """
 3-way merge function for config rev objects.
 """
-from __future__ import absolute_import
 from collections import OrderedDict
 from copy import copy
 
+import six
+
 from pyvoltha_min.common.config.config_proxy import CallbackType, OperationContext
 from pyvoltha_min.common.config.config_rev import children_fields
-import six
 
 
 class MergeConflictException(Exception):
@@ -87,7 +87,7 @@ def merge_3way(fork_rev, src_rev, dst_rev, merge_child_func, dry_run=False):
     new_children = dst_rev._children.copy()
     _children_fields = children_fields(fork_rev.data.__class__)
 
-    for field_name, field in six.iteritems(_children_fields):
+    for field_name, field in _children_fields.items():
 
         fork_list = fork_rev._children[field_name]
         src_list = src_rev._children[field_name]

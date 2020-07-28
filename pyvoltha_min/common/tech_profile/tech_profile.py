@@ -13,18 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from __future__ import absolute_import
 import json
-import ast
 from collections import namedtuple
-import structlog
 from enum import Enum
 
-from pyvoltha_min.common.config.config_backend  import ConsulStore
+import structlog
+from voltha_protos import openolt_pb2
+
+from pyvoltha_min.common.config.config_backend import ConsulStore
 from pyvoltha_min.common.config.config_backend import EtcdStore
 from pyvoltha_min.common.utils.registry import registry
-from voltha_protos import openolt_pb2
-from six.moves import range
 
 # logger
 log = structlog.get_logger()

@@ -18,18 +18,16 @@
 Adapter abstract base class
 """
 
-from __future__ import absolute_import
 import structlog
 from twisted.internet import reactor
-from zope.interface import implementer
-
-from .interface import IAdapterInterface
 from voltha_protos.adapter_pb2 import Adapter
 from voltha_protos.adapter_pb2 import AdapterConfig
 from voltha_protos.common_pb2 import AdminState
 from voltha_protos.device_pb2 import DeviceType, DeviceTypes
 from voltha_protos.health_pb2 import HealthStatus
+from zope.interface import implementer
 
+from .interface import IAdapterInterface
 
 log = structlog.get_logger()
 
@@ -156,6 +154,9 @@ class IAdapter(object):
         raise NotImplementedError()
 
     def disable_port(self, device_id, port_no):
+        raise NotImplementedError()
+
+    def child_device_lost(self, device_id, onu_id):
         raise NotImplementedError()
 
     def self_test_device(self, device):

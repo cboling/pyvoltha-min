@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from voltha_protos.events_pb2 import EventType, EventCategory, EventSubCategory
+from voltha_protos.events_pb2 import EventCategory, EventSubCategory
+
 from pyvoltha_min.adapters.extensions.events.adapter_events import DeviceEventBase
+
 
 class OnuSignalDegradeEvent(DeviceEventBase):
     def __init__(self, event_mgr, onu_id, intf_id,

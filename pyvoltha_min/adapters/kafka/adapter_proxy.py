@@ -18,16 +18,16 @@
 Agent to play gateway between adapters.
 """
 
-from __future__ import absolute_import
-import structlog
+import codecs
 from uuid import uuid4
+
+import six
+import structlog
 from twisted.internet.defer import inlineCallbacks, returnValue
-from .container_proxy import ContainerProxy
 from voltha_protos.inter_container_pb2 import InterAdapterHeader, \
     InterAdapterMessage
-import time
-import codecs
-import six
+
+from .container_proxy import ContainerProxy
 
 log = structlog.get_logger()
 
@@ -88,7 +88,7 @@ class AdapterProxy(ContainerProxy):
             h = InterAdapterHeader()
             h.type = type
             h.from_topic = self._to_string(from_adapter)
-            h.to_topic = self.remote_topic
+            h.to_topic = self._to_string(to_adapter) if to_adapter is not None else self.remote_topic
             h.to_device_id = self._to_string(to_device_id)
             h.proxy_device_id = self._to_string(proxy_device_id)
 
@@ -103,7 +103,7 @@ class AdapterProxy(ContainerProxy):
             iaMsg.body.Pack(msg)
 
             log.debug("sending-inter-adapter-message", type=iaMsg.header.type, from_topic=iaMsg.header.from_topic,
-                  to_topic=iaMsg.header.to_topic, to_device_id=iaMsg.header.to_device_id)
+                      to_topic=iaMsg.header.to_topic, to_device_id=iaMsg.header.to_device_id)
             res = yield self.invoke(rpc="process_inter_adapter_message",
                                     to_topic=iaMsg.header.to_topic,
                                     msg=iaMsg)

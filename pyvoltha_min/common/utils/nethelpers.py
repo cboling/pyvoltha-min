@@ -17,20 +17,17 @@
 """
 Some network related convenience functions
 """
-
-from __future__ import absolute_import
-from __future__ import print_function
+import netaddr
+import netifaces as ni
 from netifaces import AF_INET
 
-import netifaces as ni
-import netaddr
 
-
-def _get_all_interfaces():
-    m_interfaces = []
-    for iface in ni.interfaces():
-        m_interfaces.append((iface, ni.ifaddresses(iface)))
-    return m_interfaces
+#
+# def _get_all_interfaces():
+#     m_interfaces = []
+#     for iface in ni.interfaces():
+#         m_interfaces.append((iface, ni.ifaddresses(iface)))
+#     return m_interfaces
 
 
 def _get_my_primary_interface():
@@ -63,13 +60,16 @@ def get_my_primary_local_ipv4(inter_core_subnet=None, ifname=None):
 def get_my_primary_interface(pon_subnet=None):
     if not pon_subnet:
         return _get_my_primary_interface()
+
     # My interface should have an IP that belongs to the specified subnet
     for iface in ni.interfaces():
         addresses = ni.ifaddresses(iface)
+
         if AF_INET in addresses:
             m_ip = addresses[AF_INET][0]['addr']
             m_ip = netaddr.IPAddress(m_ip).value
             m_network = netaddr.IPNetwork(pon_subnet)
+
             if m_ip >= m_network.first and m_ip <= m_network.last:
                 return iface
     return None
@@ -85,9 +85,5 @@ def _get_my_primary_local_ipv4(ifname=None):
         return None
 
 
-def mac_str_to_tuple(mac):
-    return tuple(int(d, 16) for d in mac.split(':'))
-
-
-if __name__ == '__main__':
-    print(get_my_primary_local_ipv4())
+# def mac_str_to_tuple(mac):
+#     return tuple(int(d, 16) for d in mac.split(':'))

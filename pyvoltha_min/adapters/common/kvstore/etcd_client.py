@@ -23,13 +23,13 @@
 #
 ################################################################################
 
-from __future__ import absolute_import
-from .kv_client import DEFAULT_TIMEOUT, Event, KVClient, KVPair
 from structlog import get_logger
 from twisted.internet import reactor
-from twisted.internet.defer import inlineCallbacks, returnValue, Deferred
+from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.error import ConnectionRefusedError
 from txaioetcd import Client, CompVersion, Failed, KeySet, OpGet, OpSet, Transaction
+
+from .kv_client import DEFAULT_TIMEOUT, Event, KVClient, KVPair
 
 log = get_logger()
 

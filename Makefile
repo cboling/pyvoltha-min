@@ -32,16 +32,22 @@ help:
 	@echo "Usage: make [<target>]"
 	@echo "where available targets are:"
 	@echo
-	@echo "clean         : Remove files created by the build and tests"
-	@echo "distclean     : Remove files created by the build and tests and virtual environments"
-	@echo "dist          : Create source distribution of the python package"
 	@echo "help          : Print this help"
-	@echo "test          : Run all unit test"
-	@echo "lint          : Run all lint test"
-	@echo "venv          : Build local Python virtualenv"
-	@echo "venv-test     : Build local Python unit test and lint virtualenv"
+	@echo "test            : Run all unit test"
+	@echo "lint            : Run pylint on package"
+	@echo
+	@echo "dist          : Create source distribution of the python package"
 	@echo "upload        : Upload test version of python package to test.pypi.org"
 	@echo
+	@echo "venv          : Build local Python virtualenv"
+	@echo "venv-test     : Build local Python unit test and lint virtualenv"
+	@echo
+	@echo "show-licenses   : Show imported modules and licenses"
+	@echo "bandit-test     : Run bandit security test on package code"
+	@echo "bandit-test-all : Run bandit security test on package and imported code"
+	@echo
+	@echo "clean         : Remove files created by the build and tests"
+	@echo "distclean     : Remove files created by the build and tests and virtual environments"
 
 # ignore these directories
 .PHONY: test dist
@@ -76,7 +82,7 @@ endif
 venv-test: local-protos
 	@ VIRTUAL_ENV_DISABLE_PROMPT=true $(VENV_BIN) ${VENV_OPTS} ${TESTVENVDIR};\
         source ./${TESTVENVDIR}/bin/activate ; set -u ;\
-        pip install -r requirements.txt
+        pip install -r test/requirements.txt
 
 ifdef LOCAL_PROTOS
 	source ./${TESTVENVDIR}/bin/activate ; set -u ;\
@@ -91,6 +97,22 @@ test: clean
 	tox
 
 ######################################################################
+# License and security checks support
+
+show-licenses:
+	@ (. ${VENVDIR}/bin/activate && \
+       pip install pip-licenses && \
+       pip-licenses)
+
+bandit-test:
+	@ echo "Running python security check with bandit on module code"
+	@ (. ${TESTVENVDIR}/bin/activate && pip install bandit && bandit -n 3 -r $(WORKING_DIR)/pyvoltha_min)
+
+bandit-test-all: venv bandit-test
+	@ echo "Running python security check with bandit on imports"
+	@ (. ${TESTVENVDIR}/bin/activate && bandit -n 3 -r $(WORKING_DIR)/${VENVDIR})
+
+######################################################################
 # pylint support
 
 lint: clean
@@ -102,6 +124,12 @@ lint-pyvoltha-min:
 	@ echo
 	@ echo "See \"file://${WORKING_DIR}pylint.out.txt\" for lint report"
 	@ echo
+
+######################################################################
+# Linting of the README.rst
+
+lint-rst:
+	rst-lint --level info README.rst
 
 ######################################################################
 # Cleanup

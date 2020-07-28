@@ -14,8 +14,9 @@
 # limitations under the License.
 #
 
+import threading
 
-from __future__ import absolute_import
+from confluent_kafka import Consumer
 from confluent_kafka import Producer as _kafkaProducer
 from structlog import get_logger
 from twisted.internet import reactor
@@ -24,11 +25,8 @@ from twisted.internet.threads import deferToThread
 from zope.interface import implementer
 
 from pyvoltha_min.common.utils.consulhelpers import get_endpoint_from_consul
-from .event_bus_publisher import EventBusPublisher
 from pyvoltha_min.common.utils.registry import IComponent
-from confluent_kafka import Consumer, KafkaError
-import threading
-import six
+from .event_bus_publisher import EventBusPublisher
 
 log = get_logger()
 
@@ -127,7 +125,7 @@ class KafkaProxy(object):
                 log.debug('stopping-consumers-kafka-proxy', size=len(self.topic_consumer_map))
 
                 consumer_map, self.topic_consumer_map = self.topic_consumer_map, dict()
-                for _, c in six.iteritems(consumer_map):
+                for _, c in consumer_map.items():
                     d = deferToThread(c.close)
                     d.addTimeout(0.3, reactor, lambda _: log.error('consumer-timeout'))
                     d.addCallbacks(lambda _: log.info('consumer-success'),
@@ -206,15 +204,17 @@ class KafkaProxy(object):
 
     @inlineCallbacks
     def _wait_for_messages(self, consumer, topic):
+        log.debug('entry', topic=topic)
         while True:
             try:
                 msg = yield deferToThread(consumer.poll,
                                           self.consumer_poll_timeout)
 
                 if self.stopping:
-                    log.debug("stop-request-recieved", topic=topic)
+                    log.debug("stop-request-received", topic=topic)
                     break
 
+                log.debug('rx', topic=topic)
                 if msg is None:
                     continue
                 if msg.error():
@@ -223,6 +223,7 @@ class KafkaProxy(object):
                     continue
 
                 # Invoke callbacks
+                log.debug('invoking callbacks', topic=topic, count=len(self.topic_callbacks_map))
                 for cb in self.topic_callbacks_map[topic]:
                     yield cb(msg)
             except Exception as e:
@@ -243,6 +244,7 @@ class KafkaProxy(object):
         :param offset:  the kafka offset from where the consumer will start
         consuming messages
         """
+        log.debug('entry', topic=topic, groupId=groupId)
         try:
             self.topic_any_map_lock.acquire()
             if topic in self.topic_consumer_map:
@@ -259,6 +261,7 @@ class KafkaProxy(object):
                 'group.id': groupId,
                 'auto.offset.reset': offset
             })
+            log.debug('sending-to-thread')
             yield deferToThread(c.subscribe, [topic])
             # c.subscribe([topic])
             self.topic_consumer_map[topic] = c

@@ -20,17 +20,16 @@ Resource Manager will be unique for each OLT device.
 It exposes APIs to create/free alloc_ids/onu_ids/gemport_ids. Resource Manager
 uses a KV store in backend to ensure resiliency of the data.
 """
-from __future__ import absolute_import
-import json
 import ast
-import structlog
-from bitstring import BitArray
+import json
 import shlex
-from argparse import ArgumentParser, ArgumentError
 
-from .resource_kv_store import ResourceKvStore
+import structlog
+from argparse import ArgumentParser, ArgumentError
+from bitstring import BitArray
+
 from pyvoltha_min.common.tech_profile.tech_profile import TechProfile
-from six.moves import range
+from .resource_kv_store import ResourceKvStore
 
 
 # Used to parse extra arguments to OpenOlt adapter from the NBI

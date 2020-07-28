@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import, division
-import structlog
+from __future__ import division
+
 import arrow
+import structlog
 from twisted.internet.task import LoopingCall
-from voltha_protos.events_pb2 import KpiEvent2, KpiEventType, MetricInformation, MetricMetaData
-from voltha_protos.events_pb2 import Event, EventType, EventCategory, EventSubCategory
 from voltha_protos.device_pb2 import PmConfig
+from voltha_protos.events_pb2 import EventType, EventCategory, EventSubCategory
+from voltha_protos.events_pb2 import KpiEvent2, KpiEventType, MetricInformation, MetricMetaData
 
 
 class AdapterPmMetrics(object):

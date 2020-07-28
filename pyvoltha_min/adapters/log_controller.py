@@ -14,11 +14,12 @@
 # limitations under the License.
 #
 import os
+
 import structlog
-from pyvoltha_min.adapters.common.kvstore.twisted_etcd_store import TwistedEtcdStore
-from pyvoltha_min.common.structlog_setup import setup_logging, update_logging, string_to_int
 from twisted.internet.defer import inlineCallbacks, returnValue
 
+from pyvoltha_min.adapters.common.kvstore.twisted_etcd_store import TwistedEtcdStore
+from pyvoltha_min.common.structlog_setup import update_logging, string_to_int
 
 COMPONENT_NAME = os.environ.get("COMPONENT_NAME")
 GLOBAL_CONFIG_ROOT_NODE = "global"
@@ -29,24 +30,25 @@ CONFIG_TYPE = "loglevel"
 DEFAULT_PACKAGE_NAME = "default"
 GLOBAL_DEFAULT_LOGLEVEL = "WARN"
 
-class LogController():
+
+class LogController:
     instance_id = None
     active_log_level = None
-
 
     def __init__(self, etcd_host, etcd_port):
         self.log = structlog.get_logger()
         self.etcd_host = etcd_host
         self.etcd_port = etcd_port
         self.etcd_client = TwistedEtcdStore(self.etcd_host, self.etcd_port, KV_STORE_DATA_PATH_PREFIX)
+        self.global_config_path = self.make_config_path(GLOBAL_CONFIG_ROOT_NODE)
+        self.component_config_path = self.make_config_path(COMPONENT_NAME)
 
     def make_config_path(self, key):
-        return (DEFAULT_KV_STORE_CONFIG_PATH + KV_STORE_PATH_SEPARATOR + key + KV_STORE_PATH_SEPARATOR + CONFIG_TYPE + KV_STORE_PATH_SEPARATOR + DEFAULT_PACKAGE_NAME)
-
+        return DEFAULT_KV_STORE_CONFIG_PATH + KV_STORE_PATH_SEPARATOR + key + \
+               KV_STORE_PATH_SEPARATOR + CONFIG_TYPE + KV_STORE_PATH_SEPARATOR + DEFAULT_PACKAGE_NAME
 
     @inlineCallbacks
     def get_global_loglevel(self):
-
         global_default_loglevel = ""
 
         try:
@@ -55,16 +57,15 @@ class LogController():
                 level_int = string_to_int(str(level, 'utf-8'))
 
                 if level_int == 0:
-                    self.log.warn("Unsupported loglevel at global config path", level)
+                    self.log.warn("unsupported-log-level", level=level)
                 else:
                     global_default_loglevel = level
-                    self.log.debug("Retrieved global default loglevel", global_default_loglevel)
+                    self.log.debug("default-loglevel", level=level)
 
         except KeyError:
-            self.log.warn("Failed to retrive default global loglevel")
+            self.log.warn("failed-to-retrieve-log-level", path=self.global_config_path)
 
         returnValue(global_default_loglevel)
-
 
     @inlineCallbacks
     def get_component_loglevel(self, global_default_loglevel):
@@ -73,51 +74,52 @@ class LogController():
 
         try:
             level = yield self.etcd_client.get(self.component_config_path)
+
             if level is not None:
                 level_int = string_to_int(str(level, 'utf-8'))
 
                 if level_int == 0:
-                    self.log.warn("Unsupported loglevel at component config path", level)
+                    self.log.warn("unsupported-log-level", level=level)
 
                 else:
                     component_default_loglevel = level
-                    self.log.debug("Retrieved component default loglevel", component_default_loglevel)
+                    self.log.debug("default-loglevel", level=level)
 
         except KeyError:
-            self.log.warn("Failed to retrive default component loglevel")
+            self.log.warn("failed-to-retrieve-log-level", path=self.component_config_path)
 
         if component_default_loglevel == "":
             component_default_loglevel = GLOBAL_DEFAULT_LOGLEVEL.encode('utf-8')
 
         returnValue(component_default_loglevel)
 
-
     @inlineCallbacks
     def start_watch_log_config_change(self, instance_id, initial_default_loglevel):
-
-        self.log.debug("Start watching for log config change")
+        self.log.debug("entry")
         LogController.instance_id = instance_id
 
-        if COMPONENT_NAME == None:
-            raise Exception("Unable to retrive pod component name from runtime env")
+        if COMPONENT_NAME is None:
+            raise Exception("Unable to retrieve pod component name from runtime env")
 
         self.global_config_path = self.make_config_path(GLOBAL_CONFIG_ROOT_NODE)
         self.component_config_path = self.make_config_path(COMPONENT_NAME)
 
-        self.set_default_loglevel(self.global_config_path, self.component_config_path, initial_default_loglevel.upper())
+        self.set_default_loglevel(self.global_config_path,
+                                  self.component_config_path,
+                                  initial_default_loglevel.upper())
+
         self.process_log_config_change()
 
         yield self.etcd_client.watch(self.global_config_path, self.watch_callback)
         yield self.etcd_client.watch(self.component_config_path, self.watch_callback)
 
-
     def watch_callback(self, event):
+        self.log.debug('event', event=event)
         self.process_log_config_change()
-
 
     @inlineCallbacks
     def process_log_config_change(self):
-        self.log.debug("Processing log config change")
+        self.log.debug("log-change-occurred")
 
         global_default_level = yield self.get_global_loglevel()
         level = yield self.get_component_loglevel(global_default_level)
@@ -127,18 +129,22 @@ class LogController():
         current_log_level = level_int
         if LogController.active_log_level != current_log_level:
             LogController.active_log_level = current_log_level
-            self.log.debug("Applying updated loglevel")
+            self.log.debug("aplying-updated-loglevel",
+                           previous_level=LogController.active_log_level,
+                           new_level=current_log_level)
             update_logging(LogController.instance_id, verbosity_adjust=level_int)
 
         else:
             self.log.debug("Loglevel not updated")
 
-
     @inlineCallbacks
     def set_default_loglevel(self, global_config_path, component_config_path, initial_default_loglevel):
+        self.log.debug('set-default-level', global_path=global_config_path,
+                       component_path=component_config_path,
+                       level=initial_default_loglevel)
 
-        if (yield self.etcd_client.get(global_config_path)) == None:
+        if (yield self.etcd_client.get(global_config_path)) is None:
             yield self.etcd_client.set(global_config_path, GLOBAL_DEFAULT_LOGLEVEL)
 
-        if (yield self.etcd_client.get(component_config_path)) == None:
+        if (yield self.etcd_client.get(component_config_path)) is None:
             yield self.etcd_client.set(component_config_path, initial_default_loglevel)

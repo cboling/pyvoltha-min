@@ -17,12 +17,8 @@
 """
 A simple internal pub/sub event bus with topics and filter-based registration.
 """
-from __future__ import absolute_import
-import re
-
-import structlog
 import six
-
+import structlog
 
 log = structlog.get_logger()
 
