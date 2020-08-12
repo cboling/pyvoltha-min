@@ -101,7 +101,7 @@ class KafkaProxy(object):
                     log.debug('stopping-kclient-kafka-proxy')
                     d = deferToThread(client.close)
                     d.addTimeout(0.3, reactor, lambda _: log.error('client-timeout'))
-                    d.addCallbacks(lambda _: log.info('client-success'),
+                    d.addCallbacks(lambda _: log.debug('client-success'),
                                    lambda _: log.error('client-failure'))
                     dl.append(d)
 
@@ -113,7 +113,7 @@ class KafkaProxy(object):
                     log.debug('stopping-kproducer-kafka-proxy')
                     d = deferToThread(producer.flush)
                     d.addTimeout(0.3, reactor, lambda _: log.error('producer-timeout'))
-                    d.addCallbacks(lambda _: log.info('producer-success'),
+                    d.addCallbacks(lambda _: log.debug('producer-success'),
                                    lambda _: log.error('producer-failure'))
                     dl.append(d)
                 except Exception as e:
@@ -128,7 +128,7 @@ class KafkaProxy(object):
                 for _, c in consumer_map.items():
                     d = deferToThread(c.close)
                     d.addTimeout(0.3, reactor, lambda _: log.error('consumer-timeout'))
-                    d.addCallbacks(lambda _: log.info('consumer-success'),
+                    d.addCallbacks(lambda _: log.debug('consumer-success'),
                                    lambda _: None)
                     # lambda reason: log.error('consumer-failure: {}'.format(str(reason))))
                     dl.append(d)
@@ -148,7 +148,7 @@ class KafkaProxy(object):
                     log.info('client-producer-wait', size=len(dl))
                     d = gatherResults(dl, consumeErrors=True)
                     d.addTimeout(0.5, reactor, lambda _: None)
-                    d.addCallbacks(lambda _: log.info('client-wait-success'),
+                    d.addCallbacks(lambda _: log.debug('client-wait-success'),
                                    lambda _: log.error('client-wait-failure'))
 
                 except Exception as e:
@@ -419,7 +419,7 @@ class KafkaProxy(object):
             self.alive = False
         else:
             if self.alive is not True:
-                log.info('message-delivered-successfully', msg=msg.value())
+                log.debug('message-delivered-successfully', msg=msg.value())
                 self.alive_state_handler.callback(True)
             self.alive = True
 

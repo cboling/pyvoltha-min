@@ -300,7 +300,7 @@ class IKafkaMessagingProxy:
         """
         if self.received_msg_queue is not None:
             try:
-                log.debug("received-msg", msg=msg)
+                log.debug("received-msg", message=msg)
                 yield self.received_msg_queue.put(msg)
 
             except Exception as e:
@@ -328,8 +328,8 @@ class IKafkaMessagingProxy:
         if unicode_str is not None:
             if isinstance(unicode_str, six.string_types):
                 return unicode_str
-            else:
-                return codecs.encode(unicode_str, 'ascii')
+
+            return codecs.encode(unicode_str, 'ascii')
         else:
             return None
 
@@ -428,7 +428,7 @@ class IKafkaMessagingProxy:
             return resp
 
         except Exception as e:
-            log.exception("parsing-response-failed", msg=msg, e=e)
+            log.exception("parsing-response-failed", message=msg, e=e)
             return None
 
     @inlineCallbacks
@@ -495,35 +495,37 @@ class IKafkaMessagingProxy:
                 if targetted_topic in self.topic_target_cls_map:
                     # Augment the request arguments with the from_topic
                     augmented_args = _augment_args_with_FromTopic(msg_body.args,
-                                                        msg_body.reply_to_topic)
-                    if augmented_args:
-                        log.info("message-body-args-present", rpc=msg_body.rpc,
-                                 response_required=msg_body.response_required,
-                                 reply_to_topic=msg_body.reply_to_topic)
-                        (status, res) = yield getattr(
-                            self.topic_target_cls_map[targetted_topic],
-                            self._to_string(msg_body.rpc))(
-                            **_toDict(augmented_args))
-                    else:
-                        log.info("message-body-args-absent", rpc=msg_body.rpc,
-                                 response_required=msg_body.response_required,
-                                 reply_to_topic=msg_body.reply_to_topic,)
-                        (status, res) = yield getattr(
-                            self.topic_target_cls_map[targetted_topic],
-                            self._to_string(msg_body.rpc))()
+                                                                  msg_body.reply_to_topic)
+                    try:
+                        if augmented_args:
+                            log.debug("message-body-args-present", rpc=msg_body.rpc,
+                                      response_required=msg_body.response_required,
+                                      reply_to_topic=msg_body.reply_to_topic)
+                            (status, res) = yield getattr(
+                                self.topic_target_cls_map[targetted_topic],
+                                self._to_string(msg_body.rpc))(**_toDict(augmented_args))
+                        else:
+                            log.debug("message-body-args-absent", rpc=msg_body.rpc,
+                                      response_required=msg_body.response_required,
+                                      reply_to_topic=msg_body.reply_to_topic,)
+                            (status, res) = yield getattr(
+                                self.topic_target_cls_map[targetted_topic],
+                                self._to_string(msg_body.rpc))()
 
-                    if msg_body.response_required:
-                        response = self._format_response(
-                            msg_header=message.header,
-                            msg_body=res,
-                            status=status,
-                        )
-                        if response is not None:
-                            res_topic = self._to_string(
-                                response.header.to_topic)
-                            self._send_kafka_message(res_topic, response)
+                        if msg_body.response_required:
+                            response = self._format_response(
+                                msg_header=message.header,
+                                msg_body=res,
+                                status=status,
+                            )
+                            if response is not None:
+                                res_topic = self._to_string(
+                                    response.header.to_topic)
+                                self._send_kafka_message(res_topic, response)
 
-                        log.debug("Response-sent", to_topic=res_topic)
+                            log.debug("Response-sent", to_topic=res_topic)
+                    except Exception as _e:
+                        log.exception('request-failure', e=_e)
 
             elif message.header.type == MessageType.Value("RESPONSE"):
                 trns_id = self._to_string(message.header.id)
@@ -540,7 +542,7 @@ class IKafkaMessagingProxy:
     @inlineCallbacks
     def _send_kafka_message(self, topic, msg):
         if self.kafka_proxy is not None:
-            log.debug('sending', topic=topic, msg=msg)
+            log.debug('sending', topic=topic, message=msg)
             try:
                 yield self.kafka_proxy.send_message(topic, msg.SerializeToString())
             except Exception as e:
@@ -614,7 +616,8 @@ class IKafkaMessagingProxy:
                     else:
                         # this is the case where the core API returns a grpc code.NotFound.  Return or callback
                         # so the caller can act appropriately (i.e add whatever was not found)
-                        log.warn("send-message-response-error-result", transaction_id=transaction_id, rpc=rpc, kafka_request=request, kafka_result=res)
+                        log.info("send-message-response-error-result", transaction_id=transaction_id,
+                                 rpc=rpc, kafka_request=request, kafka_result=res)
                         if callback:
                             callback((res.success, None))
                         else:

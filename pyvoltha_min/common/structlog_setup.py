@@ -78,8 +78,9 @@ class PlainRenderedOrderedDict(OrderedDict):
     """Our special version of OrderedDict that renders into string as a dict,
        to make the log stream output cleaner.
     """
-    def __repr__(self, _repr_running={}):
+    def __repr__(self, _repr_running=None):
         """od.__repr__() <==> repr(od)"""
+        _repr_running = _repr_running or {}
         call_key = id(self), _get_ident()
         if call_key in _repr_running:
             return '...'
@@ -119,23 +120,13 @@ def setup_logging(log_config, instance_id, verbosity_adjust=0):
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         add_instance_id,
-        structlog.processors.UnicodeDecoder()
+        structlog.processors.UnicodeDecoder(),
+        structlog.processors.JSONRenderer()
     ]
-    json_format = 1
-    if json_format == 0:
-        processors.append(StructuredLogRenderer())
-
-        structlog.configure(logger_factory=structlog.stdlib.LoggerFactory(),
-                            context_class=PlainRenderedOrderedDict,
-                            wrapper_class=BoundLogger,
-                            processors=processors)
-    else:
-        processors.append(structlog.processors.JSONRenderer())
-
-        structlog.configure(logger_factory=structlog.stdlib.LoggerFactory(),
-                            context_class=JsonRenderedOrderedDict,
-                            wrapper_class=BoundLogger,
-                            processors=processors)
+    structlog.configure(logger_factory=structlog.stdlib.LoggerFactory(),
+                        context_class=JsonRenderedOrderedDict,
+                        wrapper_class=BoundLogger,
+                        processors=processors)
 
     # Mark first line of log
     log = structlog.get_logger()
@@ -154,16 +145,15 @@ def string_to_int(loglevel):
     lev = loglevel.upper()
     if lev == "DEBUG":
         return 10
-    elif lev == "INFO":
+    if lev == "INFO":
         return 20
-    elif lev == "WARN":
+    if lev == "WARN":
         return 30
-    elif lev == "ERROR":
+    if lev == "ERROR":
         return 40
-    elif lev == "FATAL":
+    if lev == "FATAL":
         return 50
-    else:
-        return 0
+    return 0
 
 
 def update_logging(instance_id, verbosity_adjust=0):

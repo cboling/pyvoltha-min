@@ -156,7 +156,7 @@ class IAdapter(object):
     def disable_port(self, device_id, port_no):
         raise NotImplementedError()
 
-    def child_device_lost(self, device_id, onu_id):
+    def child_device_lost(self, device_id, parent_port_no, onu_id):
         raise NotImplementedError()
 
     def self_test_device(self, device):
@@ -184,7 +184,7 @@ class IAdapter(object):
         return device
 
     def update_flows_incrementally(self, device, flow_changes, group_changes):
-        log.info('incremental-flow-update', device_id=device.id,
+        log.debug('incremental-flow-update', device_id=device.id,
                  flows=flow_changes, groups=group_changes)
         # For now, there is no support for group changes
         assert len(group_changes.to_add.items) == 0
@@ -286,7 +286,7 @@ class OltAdapter(IAdapter):
             log.exception('Exception', e=e)
 
     def send_proxied_message(self, proxy_address, msg):
-        log.info('send-proxied-message', proxy_address=proxy_address, msg=msg)
+        log.debug('send-proxied-message', proxy_address=proxy_address, msg=msg)
         handler = self.devices_handlers[proxy_address.device_id]
         handler.send_proxied_message(proxy_address, msg)
 
@@ -306,8 +306,8 @@ class OltAdapter(IAdapter):
 
     def receive_packet_out(self, device_id, egress_port_no, msg):
         try:
-            log.info('receive_packet_out', device_id=device_id,
-                     egress_port=egress_port_no, msg=msg)
+            log.debug('receive_packet_out', device_id=device_id,
+                      egress_port=egress_port_no, msg=msg)
             handler = self.devices_handlers[device_id]
             if handler:
                 reactor.callLater(0, handler.packet_out, egress_port_no, msg.data)
@@ -365,7 +365,7 @@ class OnuAdapter(IAdapter):
         return device
 
     def receive_proxied_message(self, proxy_address, msg):
-        log.info('receive-proxied-message', proxy_address=proxy_address,
+        log.debug('receive-proxied-message', proxy_address=proxy_address,
                  device_id=proxy_address.device_id, msg=msg)
         # Device_id from the proxy_address is the olt device id. We need to
         # get the onu device id using the port number in the proxy_address
@@ -376,7 +376,7 @@ class OnuAdapter(IAdapter):
             handler.receive_message(msg)
 
     def process_inter_adapter_message(self, msg):
-        log.info('process-inter-adapter-message', msg=msg)
+        log.debug('process-inter-adapter-message', msg=msg)
         # Unpack the header to know which device needs to handle this message
         if msg.header:
             handler = self.devices_handlers[msg.header.to_device_id]

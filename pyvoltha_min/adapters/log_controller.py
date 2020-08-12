@@ -18,8 +18,8 @@ import os
 import structlog
 from twisted.internet.defer import inlineCallbacks, returnValue
 
-from pyvoltha_min.adapters.common.kvstore.twisted_etcd_store import TwistedEtcdStore
-from pyvoltha_min.common.structlog_setup import update_logging, string_to_int
+from .common.kvstore.twisted_etcd_store import TwistedEtcdStore         # pylint: disable=relative-beyond-top-level
+from ..common.structlog_setup import update_logging, string_to_int      # pylint: disable=relative-beyond-top-level
 
 COMPONENT_NAME = os.environ.get("COMPONENT_NAME")
 GLOBAL_CONFIG_ROOT_NODE = "global"
@@ -43,7 +43,8 @@ class LogController:
         self.global_config_path = self.make_config_path(GLOBAL_CONFIG_ROOT_NODE)
         self.component_config_path = self.make_config_path(COMPONENT_NAME)
 
-    def make_config_path(self, key):
+    @staticmethod
+    def make_config_path(key):
         return DEFAULT_KV_STORE_CONFIG_PATH + KV_STORE_PATH_SEPARATOR + key + \
                KV_STORE_PATH_SEPARATOR + CONFIG_TYPE + KV_STORE_PATH_SEPARATOR + DEFAULT_PACKAGE_NAME
 
@@ -57,10 +58,10 @@ class LogController:
                 level_int = string_to_int(str(level, 'utf-8'))
 
                 if level_int == 0:
-                    self.log.warn("unsupported-log-level", level=level)
+                    self.log.warn("unsupported-log-level", requested_level=level)
                 else:
                     global_default_loglevel = level
-                    self.log.debug("default-loglevel", level=level)
+                    self.log.debug("default-loglevel", new_level=level)
 
         except KeyError:
             self.log.warn("failed-to-retrieve-log-level", path=self.global_config_path)
@@ -79,11 +80,11 @@ class LogController:
                 level_int = string_to_int(str(level, 'utf-8'))
 
                 if level_int == 0:
-                    self.log.warn("unsupported-log-level", level=level)
+                    self.log.warn("unsupported-log-level", unsupported_level=level)
 
                 else:
                     component_default_loglevel = level
-                    self.log.debug("default-loglevel", level=level)
+                    self.log.debug("default-loglevel", new_level=level)
 
         except KeyError:
             self.log.warn("failed-to-retrieve-log-level", path=self.component_config_path)
@@ -129,7 +130,7 @@ class LogController:
         current_log_level = level_int
         if LogController.active_log_level != current_log_level:
             LogController.active_log_level = current_log_level
-            self.log.debug("aplying-updated-loglevel",
+            self.log.debug("applying-updated-loglevel",
                            previous_level=LogController.active_log_level,
                            new_level=current_log_level)
             update_logging(LogController.instance_id, verbosity_adjust=level_int)
@@ -141,7 +142,7 @@ class LogController:
     def set_default_loglevel(self, global_config_path, component_config_path, initial_default_loglevel):
         self.log.debug('set-default-level', global_path=global_config_path,
                        component_path=component_config_path,
-                       level=initial_default_loglevel)
+                       def_level=initial_default_loglevel)
 
         if (yield self.etcd_client.get(global_config_path)) is None:
             yield self.etcd_client.set(global_config_path, GLOBAL_DEFAULT_LOGLEVEL)

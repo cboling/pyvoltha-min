@@ -28,11 +28,11 @@ from voltha_protos.device_pb2 import Device, Port, ImageDownload, SimulateAlarmR
 from voltha_protos.openflow_13_pb2 import FlowChanges, FlowGroups, Flows, \
     FlowGroupChanges, ofp_packet_out
 from voltha_protos.voltha_pb2 import OmciTestRequest
-from pyvoltha_min.adapters.kafka.kafka_inter_container_library import IKafkaMessagingProxy, \
-    get_messaging_proxy, KAFKA_OFFSET_LATEST, KAFKA_OFFSET_EARLIEST, ARG_FROM_TOPIC
-
+from pyvoltha_min.adapters.kafka.kafka_inter_container_library import  get_messaging_proxy, \
+    ARG_FROM_TOPIC
 
 log = structlog.get_logger()
+
 
 class MacAddressError(BaseException):
     def __init__(self, error):
@@ -77,7 +77,7 @@ class AdapterRequestFacade:
     #     yield kafka_proxy.subscribe(topic=device_topic, group_id=device_topic, target_cls=self, offset=KAFKA_OFFSET_EARLIEST)
     #     log.debug("subscribed-to-topic", topic=device_topic)
 
-    def start_omci_test(self, device, omcitestrequest, **kwargs):
+    def start_omci_test(self, device, omcitestrequest, **_kwargs):
         if not device:
             return False, Error(code=ErrorCode.INVALID_PARAMETERS,
                                 reason="device-invalid")
@@ -114,59 +114,59 @@ class AdapterRequestFacade:
             # return True, self.adapter.adopt_device(d)
 
             return True, result
-        else:
-            return False, Error(code=ErrorCode.INVALID_PARAMETERS,
-                                reason="device-invalid")
 
-    def get_ofp_device_info(self, device, **kwargs):
+        return False, Error(code=ErrorCode.INVALID_PARAMETERS,
+                            reason="device-invalid")
+
+    def get_ofp_device_info(self, device, **_kwargs):
         d = Device()
         if device:
             device.Unpack(d)
             return True, self.adapter.get_ofp_device_info(d)
-        else:
-            return False, Error(code=ErrorCode.INVALID_PARAMETERS,
-                                reason="device-invalid")
 
-    def reconcile_device(self, device, **kwargs):
+        return False, Error(code=ErrorCode.INVALID_PARAMETERS,
+                            reason="device-invalid")
+
+    def reconcile_device(self, device, **_kwargs):
         d = Device()
         if device:
             device.Unpack(d)
             return True, self.adapter.reconcile_device(d)
-        else:
-            return False, Error(code=ErrorCode.INVALID_PARAMETERS,
-                                reason="device-invalid")
 
-    def abandon_device(self, device, **kwargs):
+        return False, Error(code=ErrorCode.INVALID_PARAMETERS,
+                            reason="device-invalid")
+
+    def abandon_device(self, device, **_kwargs):
         return self.adapter.abandon_device(device)
 
-    def disable_device(self, device, **kwargs):
+    def disable_device(self, device, **_kwargs):
         d = Device()
         if device:
             device.Unpack(d)
             return True, self.adapter.disable_device(d)
-        else:
-            return False, Error(code=ErrorCode.INVALID_PARAMETERS,
-                                reason="device-invalid")
 
-    def reenable_device(self, device, **kwargs):
+        return False, Error(code=ErrorCode.INVALID_PARAMETERS,
+                            reason="device-invalid")
+
+    def reenable_device(self, device, **_kwargs):
         d = Device()
         if device:
             device.Unpack(d)
             return True, self.adapter.reenable_device(d)
-        else:
-            return False, Error(code=ErrorCode.INVALID_PARAMETERS,
-                                reason="device-invalid")
 
-    def reboot_device(self, device, **kwargs):
+        return False, Error(code=ErrorCode.INVALID_PARAMETERS,
+                            reason="device-invalid")
+
+    def reboot_device(self, device, **_kwargs):
         d = Device()
         if device:
             device.Unpack(d)
-            return (True, self.adapter.reboot_device(d))
-        else:
-            return False, Error(code=ErrorCode.INVALID_PARAMETERS,
-                                reason="device-invalid")
+            return True, self.adapter.reboot_device(d)
 
-    def update_pm_config(self, device, pm_configs, **kwargs):
+        return False, Error(code=ErrorCode.INVALID_PARAMETERS,
+                            reason="device-invalid")
+
+    def update_pm_config(self, device, pm_configs, **_kwargs):
         d = Device()
         if device:
             device.Unpack(d)
@@ -177,9 +177,9 @@ class AdapterRequestFacade:
         if pm_configs:
             pm_configs.Unpack(pm)
 
-        return (True, self.adapter.update_pm_config(d, pm))
+        return True, self.adapter.update_pm_config(d, pm)
 
-    def download_image(self, device, request, **kwargs):
+    def download_image(self, device, request, **_kwargs):
         d = Device()
         if device:
             device.Unpack(d)
@@ -195,7 +195,7 @@ class AdapterRequestFacade:
 
         return True, self.adapter.download_image(device, request)
 
-    def get_image_download_status(self, device, request, **kwargs):
+    def get_image_download_status(self, device, request, **_kwargs):
         d = Device()
         if device:
             device.Unpack(d)
@@ -211,7 +211,7 @@ class AdapterRequestFacade:
 
         return True, self.adapter.get_image_download_status(device, request)
 
-    def cancel_image_download(self, device, request, **kwargs):
+    def cancel_image_download(self, device, request, **_kwargs):
         d = Device()
         if device:
             device.Unpack(d)
@@ -227,7 +227,7 @@ class AdapterRequestFacade:
 
         return True, self.adapter.cancel_image_download(device, request)
 
-    def activate_image_update(self, device, request, **kwargs):
+    def activate_image_update(self, device, request, **_kwargs):
         d = Device()
         if device:
             device.Unpack(d)
@@ -243,7 +243,7 @@ class AdapterRequestFacade:
 
         return True, self.adapter.activate_image_update(device, request)
 
-    def revert_image_update(self, device, request, **kwargs):
+    def revert_image_update(self, device, request, **_kwargs):
         d = Device()
         if device:
             device.Unpack(d)
@@ -259,7 +259,7 @@ class AdapterRequestFacade:
 
         return True, self.adapter.revert_image_update(device, request)
 
-    def enable_port(self, deviceId, port, **kwargs):
+    def enable_port(self, deviceId, port, **_kwargs):
         if not deviceId:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
                                 reason="device-id")
@@ -273,7 +273,7 @@ class AdapterRequestFacade:
 
         return True, self.adapter.enable_port(t.val, p.port_no)
 
-    def disable_port(self, deviceId, port, **kwargs):
+    def disable_port(self, deviceId, port, **_kwargs):
         if not deviceId:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
                                 reason="device-id")
@@ -287,25 +287,31 @@ class AdapterRequestFacade:
 
         return True, self.adapter.disable_port(t.val, p.port_no)
 
-    def child_device_lost(self, deviceId, onu_id, **kwargs):
-        if not deviceId:
+    def child_device_lost(self, pDeviceId, pPortNo, onuID, **_kwargs):
+        if not pDeviceId:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
                                 reason="device-id")
-        if not onu_id:
+        if not pPortNo:
+            return False, Error(code=ErrorCode.INVALID_PARAMETER,
+                                reason="p-port-no")
+        if not onuID:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
                                 reason="onu-id")
         t = StrType()
-        deviceId.Unpack(t)
+        pDeviceId.Unpack(t)
+
+        port_no = IntType()
+        pPortNo.Unpack(port_no)
 
         oid = IntType()
-        onu_id.Unpack(oid)
+        onuID.Unpack(oid)
 
-        return True, self.adapter.child_device_lost(t.val, oid.val)
+        return True, self.adapter.child_device_lost(t.val, port_no.val, oid.val)
 
-    def self_test(self, device, **kwargs):
+    def self_test(self, device, **_kwargs):
         return self.adapter.self_test_device(device)
 
-    def delete_device(self, device, **kwargs):
+    def delete_device(self, device, **_kwargs):
         d = Device()
         if device:
             device.Unpack(d)
@@ -318,15 +324,15 @@ class AdapterRequestFacade:
             device_topic = kafka_proxy.get_default_topic() + "/" + d.id
             kafka_proxy.unsubscribe(topic=device_topic)
 
-            return (True, result)
-        else:
-            return False, Error(code=ErrorCode.INVALID_PARAMETERS,
-                                reason="device-invalid")
+            return True, result
 
-    def get_device_details(self, device, **kwargs):
+        return False, Error(code=ErrorCode.INVALID_PARAMETERS,
+                            reason="device-invalid")
+
+    def get_device_details(self, device, **_kwargs):
         return self.adapter.get_device_details(device)
 
-    def update_flows_bulk(self, device, flows, groups, **kwargs):
+    def update_flows_bulk(self, device, flows, groups, **_kwargs):
         d = Device()
         if device:
             device.Unpack(d)
@@ -343,7 +349,7 @@ class AdapterRequestFacade:
 
         return True, self.adapter.update_flows_bulk(d, f, g)
 
-    def update_flows_incrementally(self, device, flow_changes, group_changes, **kwargs):
+    def update_flows_incrementally(self, device, flow_changes, group_changes, **_kwargs):
         d = Device()
         if device:
             device.Unpack(d)
@@ -360,13 +366,13 @@ class AdapterRequestFacade:
 
         return True, self.adapter.update_flows_incrementally(d, f, g)
 
-    def suppress_alarm(self, filter, **kwargs):
-        return self.adapter.suppress_alarm(filter)
+    def suppress_alarm(self, alarm_filter, **_kwargs):
+        return self.adapter.suppress_alarm(alarm_filter)
 
-    def unsuppress_alarm(self, filter, **kwargs):
-        return self.adapter.unsuppress_alarm(filter)
+    def unsuppress_alarm(self, alarm_filter, **_kwargs):
+        return self.adapter.unsuppress_alarm(alarm_filter)
 
-    def process_inter_adapter_message(self, msg, **kwargs):
+    def process_inter_adapter_message(self, msg, **_kwargs):
         m = InterAdapterMessage()
         if msg:
             msg.Unpack(m)
@@ -381,7 +387,7 @@ class AdapterRequestFacade:
         #       for it to exit PREPROVISIONING and go to ENABLED to indicate 'adopt' was received from core
         return True, self.adapter.process_inter_adapter_message(m)
 
-    def receive_packet_out(self, deviceId, outPort, packet, **kwargs):
+    def receive_packet_out(self, deviceId, outPort, packet, **_kwargs):
         try:
             d_id = StrType()
             if deviceId:
@@ -403,11 +409,12 @@ class AdapterRequestFacade:
                 return False, Error(code=ErrorCode.INVALID_PARAMETERS,
                                     reason="packet-invalid")
 
-            return (True, self.adapter.receive_packet_out(d_id.val, op.val, p))
+            return True, self.adapter.receive_packet_out(d_id.val, op.val, p)
+
         except Exception as e:
             log.exception("error-processing-receive_packet_out", e=e)
-            
-    def simulate_alarm(self, device, request, **kwargs):
+
+    def simulate_alarm(self, device, request, **_kwargs):
         d = Device()
         if device:
             device.Unpack(d)
@@ -421,5 +428,4 @@ class AdapterRequestFacade:
             return False, Error(code=ErrorCode.INVALID_PARAMETERS,
                                 reason="simulate-alarm-request-invalid")
 
-        return True, self.adapter.simulate_alarm(d, req) 
-
+        return True, self.adapter.simulate_alarm(d, req)

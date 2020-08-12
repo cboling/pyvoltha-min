@@ -70,7 +70,7 @@ class ContainerProxy:
                             log.debug("successful-response-none", func=func)
                             returnValue(None)
                     else:
-                        log.warn("unsuccessful-request", func=func, args=args,
+                        log.info("unsuccessful-request", func=func, args=args,
                                  kw=kw)
                         returnValue(d)
                 except Exception as e:

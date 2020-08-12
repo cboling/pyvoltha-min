@@ -183,7 +183,7 @@ class IAdapterInterface(Interface):
         :param port: A voltha.Port object
         """
 
-    def child_device_lost(device_id, onu_id):
+    def child_device_lost(device_id, parent_port_no, onu_id):
         """
         Missing
         """
