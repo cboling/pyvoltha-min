@@ -12,11 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import structlog
 import etcd3
 from twisted.internet import threads
 
+log = structlog.get_logger()
 
-class TwistedEtcdStore(object):
+
+class TwistedEtcdStore:
 
     def __init__(self, host, port, path_prefix):
         self._etcd = etcd3.client(host=host, port=port)
@@ -30,7 +33,7 @@ class TwistedEtcdStore(object):
     def get(self, key):
 
         def success(results):
-            (value, meta) = results
+            (value, _meta) = results
             return value
 
         def failure(exception):
@@ -46,8 +49,7 @@ class TwistedEtcdStore(object):
         def success(results):
             if results:
                 return results
-            else:
-                return False
+            return False
 
         def failure(exception):
             raise exception
@@ -71,28 +73,30 @@ class TwistedEtcdStore(object):
         return deferred
 
     def delete(self, key):
+        log.info('entry', key=key)
 
-        def success(results):
+        def success(results, k):
+            log.info('delete-success', results=results, key=k)
             if results:
                 return results
-            else:
-                return False
+            return False
 
         def failure(exception):
             raise exception
 
         deferred = threads.deferToThread(self._etcd.delete, self.make_path(key))
-        deferred.addCallback(success)
+        deferred.addCallback(success, key)
         deferred.addErrback(failure)
         return deferred
 
     def delete_prefix(self, prefix):
+        log.info('entry', prefix=prefix)
 
-        def success(results):
+        def success(results, k):
+            log.info('delete-prefix-success', results=results, prefix=k)
             if results:
                 return results
-            else:
-                return False
+            return False
 
         def failure(exception):
             raise exception
@@ -106,6 +110,6 @@ class TwistedEtcdStore(object):
                 prefix = prefix[:-1]
 
         deferred = threads.deferToThread(self._etcd.delete_prefix, prefix)
-        deferred.addCallback(success)
+        deferred.addCallback(success, prefix)
         deferred.addErrback(failure)
         return deferred
