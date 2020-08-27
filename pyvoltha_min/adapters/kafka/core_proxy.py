@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
+# pylint: skip-file
 """
 Agent to play gateway between CORE and an adapter.
 """
@@ -48,11 +48,11 @@ class CoreProxy(ContainerProxy):
         log.debug("update_device_core_reference")
         self.deviceId_to_core_map[device_id] = core_topic
 
-    def delete_device_core_reference(self, device_id, core_topic):
+    def delete_device_core_reference(self, device_id, _core_topic):
         log.debug("delete_device_core_reference")
         del self.deviceId_to_core_map[device_id]
 
-    def get_adapter_topic(self, **kwargs):
+    def get_adapter_topic(self, **_kwargs):
         return self.listening_topic
 
     def get_core_topic(self, device_id):
@@ -80,7 +80,7 @@ class CoreProxy(ContainerProxy):
 
         if adapter.currentReplica > adapter.totalReplicas:
             raise Exception("currentReplica (%d) can't be greater than totalReplicas (%d)"
-                          % (adapter.currentReplica, adapter.totalReplicas))
+                            % (adapter.currentReplica, adapter.totalReplicas))
 
         try:
             res = yield self.invoke(rpc="Register",
@@ -96,8 +96,8 @@ class CoreProxy(ContainerProxy):
     @inlineCallbacks
     def get_device(self, device_id):
         log.debug("get-device")
-        id = ID()
-        id.id = device_id
+        dev_id = ID()
+        dev_id.id = device_id
         # Once we have a device being managed, all communications between the
         # the adapter and the core occurs over a topic associated with that
         # device
@@ -109,30 +109,30 @@ class CoreProxy(ContainerProxy):
         res = yield self.invoke(rpc="GetDevice",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
-                                device_id=id)
+                                device_id=dev_id)
         returnValue(res)
 
     @ContainerProxy.wrap_request(Device)
     @inlineCallbacks
     def get_child_device(self, parent_device_id, **kwargs):
         log.debug("get-child-device")
-        id = ID()
-        id.id = parent_device_id
+        dev_id = ID()
+        dev_id.id = parent_device_id
         to_topic = self.get_core_topic(parent_device_id)
         reply_topic = self.get_adapter_topic()
         args = self._to_proto(**kwargs)
         res = yield self.invoke(rpc="GetChildDevice",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
-                                device_id=id,
+                                device_id=dev_id,
                                 **args)
         returnValue(res)
 
     @ContainerProxy.wrap_request(Ports)
     @inlineCallbacks
     def get_ports(self, device_id, port_type):
-        id = ID()
-        id.id = device_id
+        dev_id = ID()
+        dev_id.id = device_id
         p_type = IntType()
         p_type.val = port_type
         to_topic = self.get_core_topic(device_id)
@@ -143,7 +143,7 @@ class CoreProxy(ContainerProxy):
         res = yield self.invoke(rpc="GetPorts",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
-                                device_id=id,
+                                device_id=dev_id,
                                 port_type=p_type)
         returnValue(res)
 
@@ -151,22 +151,22 @@ class CoreProxy(ContainerProxy):
     @inlineCallbacks
     def get_child_devices(self, parent_device_id):
         log.debug("get-child-devices")
-        id = ID()
-        id.id = parent_device_id
+        dev_id = ID()
+        dev_id.id = parent_device_id
         to_topic = self.get_core_topic(parent_device_id)
         reply_topic = self.get_adapter_topic()
         res = yield self.invoke(rpc="GetChildDevices",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
-                                device_id=id)
+                                device_id=dev_id)
         returnValue(res)
 
     @ContainerProxy.wrap_request(Device)
     @inlineCallbacks
     def get_child_device_with_proxy_address(self, proxy_address):
         log.debug("get-child-device-with-proxy-address")
-        id = ID()
-        id.id = proxy_address.device_id
+        dev_id = ID()
+        dev_id.id = proxy_address.device_id
         to_topic = self.get_core_topic(proxy_address.device_id)
         reply_topic = self.get_adapter_topic()
         res = yield self.invoke(rpc="GetChildDeviceWithProxyAddress",
@@ -202,8 +202,8 @@ class CoreProxy(ContainerProxy):
                               child_device_type,
                               channel_id,
                               **kw):
-        id = ID()
-        id.id = parent_device_id
+        dev_id = ID()
+        dev_id.id = parent_device_id
         ppn = IntType()
         ppn.val = parent_port_no
         cdt = StrType()
@@ -219,7 +219,7 @@ class CoreProxy(ContainerProxy):
         res = yield self.invoke(rpc="ChildDeviceDetected",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
-                                parent_device_id=id,
+                                parent_device_id=dev_id,
                                 parent_port_no=ppn,
                                 child_device_type=cdt,
                                 channel_id=channel,
@@ -255,7 +255,7 @@ class CoreProxy(ContainerProxy):
                                 device=device)
         returnValue(res)
 
-    def child_device_removed(parent_device_id, child_device_id):
+    def child_device_removed(self, parent_device_id, child_device_id):
         raise NotImplementedError()
 
     @ContainerProxy.wrap_request(None)
@@ -263,8 +263,8 @@ class CoreProxy(ContainerProxy):
     def device_state_update(self, device_id,
                             oper_status=None,
                             connect_status=None):
-        id = ID()
-        id.id = device_id
+        dev_id = ID()
+        dev_id.id = device_id
         o_status = IntType()
         if oper_status or oper_status == OperStatus.UNKNOWN:
             o_status.val = oper_status
@@ -284,7 +284,7 @@ class CoreProxy(ContainerProxy):
         res = yield self.invoke(rpc="DeviceStateUpdate",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
-                                device_id=id,
+                                device_id=dev_id,
                                 oper_status=o_status,
                                 connect_status=c_status)
         returnValue(res)
@@ -294,8 +294,8 @@ class CoreProxy(ContainerProxy):
     def children_state_update(self, device_id,
                               oper_status=None,
                               connect_status=None):
-        id = ID()
-        id.id = device_id
+        dev_id = ID()
+        dev_id.id = device_id
         o_status = IntType()
         if oper_status or oper_status == OperStatus.UNKNOWN:
             o_status.val = oper_status
@@ -315,9 +315,28 @@ class CoreProxy(ContainerProxy):
         res = yield self.invoke(rpc="ChildrenStateUpdate",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
-                                device_id=id,
+                                device_id=dev_id,
                                 oper_status=o_status,
                                 connect_status=c_status)
+        returnValue(res)
+
+    @ContainerProxy.wrap_request(None)
+    @inlineCallbacks
+    def reconcile_child_devices(self, parent_device_id):
+
+        log.warn("todo", reason='This has not been debugged yet')
+        dev_id = ID()
+        dev_id.id = parent_device_id
+
+        to_topic = self.get_core_topic(parent_device_id)
+        reply_topic = self.get_adapter_topic()
+
+        # to_topic = createSubTopic(self.core_topic, device_id)
+        # reply_topic = createSubTopic(self.listening_topic, device_id)
+        res = yield self.invoke(rpc="ReconcileChildDevices",
+                                to_topic=to_topic,
+                                reply_topic=reply_topic,
+                                device_id=dev_id)
         returnValue(res)
 
     @ContainerProxy.wrap_request(None)
@@ -327,8 +346,8 @@ class CoreProxy(ContainerProxy):
                           port_type,
                           port_no,
                           oper_status):
-        id = ID()
-        id.id = device_id
+        dev_id = ID()
+        dev_id.id = device_id
         pt = IntType()
         pt.val = port_type
         pNo = IntType()
@@ -344,7 +363,7 @@ class CoreProxy(ContainerProxy):
         res = yield self.invoke(rpc="PortStateUpdate",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
-                                device_id=id,
+                                device_id=dev_id,
                                 port_type=pt,
                                 port_no=pNo,
                                 oper_status=o_status)
@@ -356,8 +375,8 @@ class CoreProxy(ContainerProxy):
                                    oper_status=None,
                                    connect_status=None):
 
-        id = ID()
-        id.id = parent_device_id
+        dev_id = ID()
+        dev_id.id = parent_device_id
         o_status = IntType()
         if oper_status or oper_status == OperStatus.UNKNOWN:
             o_status.val = oper_status
@@ -377,12 +396,12 @@ class CoreProxy(ContainerProxy):
         res = yield self.invoke(rpc="child_devices_state_update",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
-                                parent_device_id=id,
+                                parent_device_id=dev_id,
                                 oper_status=o_status,
                                 connect_status=c_status)
         returnValue(res)
 
-    def child_devices_removed(parent_device_id):
+    def child_devices_removed(self, parent_device_id):
         raise NotImplementedError()
 
     @ContainerProxy.wrap_request(None)
@@ -428,8 +447,8 @@ class CoreProxy(ContainerProxy):
                            port_type_filter,
                            oper_status):
         log.debug("ports_state_update", device_id=device_id, oper_status=oper_status)
-        id = ID()
-        id.id = device_id
+        dev_id = ID()
+        dev_id.id = device_id
         t_filter = IntType()
         t_filter.val = port_type_filter
         o_status = IntType()
@@ -443,28 +462,28 @@ class CoreProxy(ContainerProxy):
         res = yield self.invoke(rpc="PortsStateUpdate",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
-                                device_id=id,
+                                device_id=dev_id,
                                 port_type_filter=t_filter,
                                 oper_status=o_status)
         log.debug("ports_state_update_response", device_id=device_id, port_type_filter=port_type_filter, oper_status=oper_status, response=res)
         returnValue(res)
 
-    def port_removed(device_id, port):
+    def port_removed(self, device_id, port):
         raise NotImplementedError()
 
-    def ports_enabled(device_id):
+    def ports_enabled(self, device_id):
         raise NotImplementedError()
 
-    def ports_disabled(device_id):
+    def ports_disabled(self, device_id):
         raise NotImplementedError()
 
-    def ports_oper_status_update(device_id, oper_status):
+    def ports_oper_status_update(self, device_id, oper_status):
         raise NotImplementedError()
 
-    def image_download_update(img_dnld):
+    def image_download_update(self, img_dnld):
         raise NotImplementedError()
 
-    def image_download_deleted(img_dnld):
+    def image_download_deleted(self, img_dnld):
         raise NotImplementedError()
 
     @ContainerProxy.wrap_request(None)
@@ -492,8 +511,8 @@ class CoreProxy(ContainerProxy):
     @ContainerProxy.wrap_request(None)
     @inlineCallbacks
     def device_reason_update(self, device_id, reason):
-        id = ID()
-        id.id = device_id
+        dev_id = ID()
+        dev_id.id = device_id
         rsn = StrType()
         rsn.val = reason
         to_topic = self.get_core_topic(device_id)
@@ -502,57 +521,56 @@ class CoreProxy(ContainerProxy):
         res = yield self.invoke(rpc="DeviceReasonUpdate",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
-                                device_id=id,
+                                device_id=dev_id,
                                 device_reason=rsn)
-
         returnValue(res)
 
     # ~~~~~~~~~~~~~~~~~~~ Handle event submissions ~~~~~~~~~~~~~~~~~~~~~
 
-    def filter_alarm(self, device_id, alarm_event):
+    def filter_alarm(self, _device_id, _alarm_event):
         '''
         TODO
         alarm filtering functionality is not implemented
         in Voltha 1.x
         '''
         log.warn('filter_alarm is not implemented')
-        return
+        #return
         #alarm_filters = self.root_proxy.get('/alarm_filters')
 
-        rule_values = {
-            'id': alarm_event.id,
-            'type': AlarmEventType.AlarmEventType.Name(alarm_event.type),
-            'category': AlarmEventCategory.AlarmEventCategory.Name(
-                alarm_event.category),
-            'severity': AlarmEventSeverity.AlarmEventSeverity.Name(
-                alarm_event.severity),
-            'resource_id': alarm_event.resource_id,
-            'device_id': device_id
-        }
-
-        for alarm_filter in alarm_filters:
-            if alarm_filter.rules:
-                exclude = True
-                for rule in alarm_filter.rules:
-                    log.debug("compare-alarm-event",
-                                   key=EventFilterRuleKey.EventFilterRuleKey.Name(
-                                       rule.key),
-                                   actual=rule_values[
-                                       EventFilterRuleKey.EventFilterRuleKey.Name(
-                                           rule.key)].lower(),
-                                   expected=rule.value.lower())
-                    exclude = exclude and \
-                              (rule_values[
-                                   EventFilterRuleKey.EventFilterRuleKey.Name(
-                                       rule.key)].lower() == rule.value.lower())
-                    if not exclude:
-                        break
-
-                if exclude:
-                    log.info("filtered-alarm-event", alarm=alarm_event)
-                    return True
-
-        return False
+        # rule_values = {
+        #     'id': alarm_event.id,
+        #     'type': AlarmEventType.AlarmEventType.Name(alarm_event.type),
+        #     'category': AlarmEventCategory.AlarmEventCategory.Name(
+        #         alarm_event.category),
+        #     'severity': AlarmEventSeverity.AlarmEventSeverity.Name(
+        #         alarm_event.severity),
+        #     'resource_id': alarm_event.resource_id,
+        #     'device_id': device_id
+        # }
+        #
+        # for alarm_filter in alarm_filters:
+        #     if alarm_filter.rules:
+        #         exclude = True
+        #         for rule in alarm_filter.rules:
+        #             log.debug("compare-alarm-event",
+        #                       key=EventFilterRuleKey.EventFilterRuleKey.Name(
+        #                           rule.key),
+        #                       actual=rule_values[
+        #                           EventFilterRuleKey.EventFilterRuleKey.Name(
+        #                               rule.key)].lower(),
+        #                       expected=rule.value.lower())
+        #             exclude = exclude and \
+        #                       (rule_values[
+        #                           EventFilterRuleKey.EventFilterRuleKey.Name(
+        #                               rule.key)].lower() == rule.value.lower())
+        #             if not exclude:
+        #                 break
+        #
+        #         if exclude:
+        #             log.info("filtered-alarm-event", alarm=alarm_event)
+        #             return True
+        #
+        # return False
 
     @inlineCallbacks
     def submit_event(self, event_msg):
@@ -561,5 +579,4 @@ class CoreProxy(ContainerProxy):
             res = yield self.kafka_proxy._send_kafka_message(self.event_default_topic, event_msg)
             returnValue(res)
         except Exception as e:
-            log.exception('failed-event-submission',
-                        type=type(event_msg), e=e)
+            log.exception('failed-event-submission', type=type(event_msg), e=e)

@@ -108,7 +108,7 @@ class KVClient():
         '''
         This method acts essentially like a semaphore. The underlying mechanism
         differs depending on the KV store: etcd uses a test-and-set transaction;
-        consul uses an acquire lock. If using etcd, do NOT write to the key
+        If using etcd, do NOT write to the key
         subsequent to the initial reservation; the TTL functionality may become
         impaired (i.e. the reservation never expires).
 

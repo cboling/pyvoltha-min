@@ -183,9 +183,9 @@ class IAdapter(object):
                           flows.items)
         return device
 
-    def update_flows_incrementally(self, device, flow_changes, group_changes):
+    def update_flows_incrementally(self, device, flow_changes, group_changes, flow_metadata):
         log.debug('incremental-flow-update', device_id=device.id,
-                 flows=flow_changes, groups=group_changes)
+                 flows=flow_changes, groups=group_changes, metadata=flow_metadata)
         # For now, there is no support for group changes
         assert len(group_changes.to_add.items) == 0
         assert len(group_changes.to_remove.items) == 0
@@ -199,7 +199,7 @@ class IAdapter(object):
         # Add flows
         if len(flow_changes.to_add.items) != 0:
             reactor.callLater(0, handler.add_to_flow_table,
-                              flow_changes.to_add.items)
+                              flow_changes.to_add.items, flow_metadata)
         return device
 
     def update_pm_config(self, device, pm_config):
@@ -215,10 +215,10 @@ class IAdapter(object):
     def receive_packet_out(self, device_id, egress_port_no, msg):
         raise NotImplementedError()
 
-    def suppress_alarm(self, filter):
+    def suppress_event(self, filter):
         raise NotImplementedError()
 
-    def unsuppress_alarm(self, filter):
+    def unsuppress_event(self, filter):
         raise NotImplementedError()
 
     def _get_handler(self, device):

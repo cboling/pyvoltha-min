@@ -325,8 +325,27 @@ def get_metadata_from_write_metadata(flow):
             return instruction.write_metadata.metadata
     return None
 
+
 def get_tp_id_from_metadata(write_metadata_value):
     return (write_metadata_value >> 32) & 0xffff
+
+
+def get_egress_port_number_from_metadata(flow):
+    write_metadata_value = get_write_metadata(flow)
+    if write_metadata_value is None:
+        return None
+
+    # Lower 32-bits
+    return write_metadata_value & 0xffffffff
+
+
+def get_inner_tag_from_write_metadata(flow):
+    write_metadata_value = get_write_metadata(flow)
+    if write_metadata_value is None:
+        return None
+
+    return (write_metadata_value >> 48) & 0xffff
+
 
 def get_actions(flow):
     """Extract list of ofp_action objects from flow spec object"""
@@ -336,11 +355,13 @@ def get_actions(flow):
         if instruction.type == ofp.OFPIT_APPLY_ACTIONS:
             return instruction.actions.actions
 
+
 def get_default_vlan(flow):
     for field in get_ofb_fields(flow):
         if field.type == VLAN_VID:
             return field.vlan_vid & 0xfff
     return 0
+
 
 def get_ofb_fields(flow):
     assert isinstance(flow, ofp.ofp_flow_stats)

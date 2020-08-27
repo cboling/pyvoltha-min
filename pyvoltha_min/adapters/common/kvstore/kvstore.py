@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .consul_client import ConsulClient
 from .etcd_client import EtcdClient
 
 
@@ -20,13 +19,12 @@ def create_kv_client(kv_store, host, port):
     '''
     Factory for creating a client interface to a KV store
 
-    :param kv_store: Specify either 'etcd' or 'consul'
+    :param kv_store: Specify 'etcd'
     :param host: Name or IP address of host serving the KV store
     :param port: Port number (integer) of the KV service
     :return: Reference to newly created client interface
     '''
     if kv_store == 'etcd':
         return EtcdClient(host, port)
-    elif kv_store == 'consul':
-        return ConsulClient(host, port)
+
     return None

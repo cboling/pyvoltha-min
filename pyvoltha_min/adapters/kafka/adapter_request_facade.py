@@ -27,7 +27,7 @@ from voltha_protos.inter_container_pb2 import IntType, InterAdapterMessage, StrT
 from voltha_protos.device_pb2 import Device, Port, ImageDownload, SimulateAlarmRequest, PmConfigs
 from voltha_protos.openflow_13_pb2 import FlowChanges, FlowGroups, Flows, \
     FlowGroupChanges, ofp_packet_out
-from voltha_protos.voltha_pb2 import OmciTestRequest
+from voltha_protos.voltha_pb2 import OmciTestRequest, FlowMetadata
 from pyvoltha_min.adapters.kafka.kafka_inter_container_library import  get_messaging_proxy, \
     ARG_FROM_TOPIC
 
@@ -349,28 +349,32 @@ class AdapterRequestFacade:
 
         return True, self.adapter.update_flows_bulk(d, f, g)
 
-    def update_flows_incrementally(self, device, flow_changes, group_changes, **_kwargs):
-        d = Device()
+    def update_flows_incrementally(self, device, flow_changes, group_changes, flow_metadata, **_kwargs):
+        dev = Device()
         if device:
-            device.Unpack(d)
+            device.Unpack(dev)
         else:
             return False, Error(code=ErrorCode.INVALID_PARAMETERS,
                                 reason="device-invalid")
-        f = FlowChanges()
+        flows = FlowChanges()
         if flow_changes:
-            flow_changes.Unpack(f)
+            flow_changes.Unpack(flows)
 
-        g = FlowGroupChanges()
+        groups = FlowGroupChanges()
         if group_changes:
-            group_changes.Unpack(g)
+            group_changes.Unpack(groups)
 
-        return True, self.adapter.update_flows_incrementally(d, f, g)
+        metadata = FlowMetadata()
+        if flow_metadata:
+            flow_metadata.Unpack(metadata)
 
-    def suppress_alarm(self, alarm_filter, **_kwargs):
-        return self.adapter.suppress_alarm(alarm_filter)
+        return True, self.adapter.update_flows_incrementally(dev, flows, groups, metadata)
 
-    def unsuppress_alarm(self, alarm_filter, **_kwargs):
-        return self.adapter.unsuppress_alarm(alarm_filter)
+    def suppress_event(self, event_filter, **_kwargs):
+        return self.adapter.suppress_event(event_filter)
+
+    def unsuppress_event(self, event_filter, **_kwargs):
+        return self.adapter.unsuppress_event(event_filter)
 
     def process_inter_adapter_message(self, msg, **_kwargs):
         m = InterAdapterMessage()

@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import re
 import json
 from collections import namedtuple
 from enum import Enum
@@ -20,7 +21,6 @@ from enum import Enum
 import structlog
 from voltha_protos import openolt_pb2
 
-from pyvoltha_min.common.config.config_backend import ConsulStore
 from pyvoltha_min.common.config.config_backend import EtcdStore
 from pyvoltha_min.common.utils.registry import registry
 
@@ -32,18 +32,22 @@ DEFAULT_TECH_PROFILE_TABLE_ID = 64
 # Enums used while creating TechProfileInstance
 Direction = Enum('Direction', ['UPSTREAM', 'DOWNSTREAM', 'BIDIRECTIONAL'],
                  start=0)
+
 SchedulingPolicy = Enum('SchedulingPolicy',
                         ['WRR', 'StrictPriority', 'Hybrid'], start=0)
+
 AdditionalBW = Enum('AdditionalBW', ['None', 'NA', 'BestEffort', 'Auto'],
                     start=0)
+
 DiscardPolicy = Enum('DiscardPolicy',
-                     ['TailDrop', 'WTailDrop', 'RED', 'WRED'], start=0)
+                     ['TailDrop', 'WTailDrop', 'Red', 'WRed'], start=0)
+
 InferredAdditionBWIndication = Enum('InferredAdditionBWIndication',
                                     ['None', 'NoneAssured', 'BestEffort'],
                                     start=0)
 
 
-class InstanceControl(object):
+class InstanceControl:
     # Default value constants
     ONU_DEFAULT_INSTANCE = 'multi-instance'
     UNI_DEFAULT_INSTANCE = 'single-instance'
@@ -60,12 +64,12 @@ class InstanceControl(object):
         self.max_gem_payload_size = max_gem_payload_size
 
 
-class Scheduler(object):
+class Scheduler:
     # Default value constants
-    DEFAULT_ADDITIONAL_BW = 'auto'
+    DEFAULT_ADDITIONAL_BW = 'BestEffort'
     DEFAULT_PRIORITY = 0
     DEFAULT_WEIGHT = 0
-    DEFAULT_Q_SCHED_POLICY = 'hybrid'
+    DEFAULT_Q_SCHED_POLICY = 'Hybrid'
 
     def __init__(self, direction, additional_bw=DEFAULT_ADDITIONAL_BW,
                  priority=DEFAULT_PRIORITY,
@@ -78,21 +82,29 @@ class Scheduler(object):
         self.q_sched_policy = q_sched_policy
 
 
-class GemPortAttribute(object):
+class GemPortAttribute:
     # Default value constants
     DEFAULT_AES_ENCRYPTION = 'True'
     DEFAULT_PRIORITY_Q = 0
     DEFAULT_WEIGHT = 0
     DEFAULT_MAX_Q_SIZE = 'auto'
     DEFAULT_DISCARD_POLICY = DiscardPolicy.TailDrop.name
+    DEFAULT_SCHEDULING_POLICY = SchedulingPolicy.WRR.name
+    DEFAULT_DYNAMIC_ACL = '224.0.0.0-239.255.255.255'
+    DEFAULT_STATIC_ACL = DEFAULT_DYNAMIC_ACL
+    DEFAULT_MULTICAST_GEM_ID = 4096
 
     def __init__(self, pbit_map, discard_config,
                  aes_encryption=DEFAULT_AES_ENCRYPTION,
-                 scheduling_policy=SchedulingPolicy.WRR.name,
+                 scheduling_policy=DEFAULT_SCHEDULING_POLICY,
                  priority_q=DEFAULT_PRIORITY_Q,
                  weight=DEFAULT_WEIGHT,
                  max_q_size=DEFAULT_MAX_Q_SIZE,
-                 discard_policy=DiscardPolicy.TailDrop.name):
+                 discard_policy=DiscardPolicy.TailDrop.name,
+                 is_multicast=False,
+                 dynamic_access_control_list=DEFAULT_DYNAMIC_ACL,
+                 static_access_control_list=DEFAULT_STATIC_ACL,
+                 multicast_gem_id=DEFAULT_MULTICAST_GEM_ID):
         self.max_q_size = max_q_size
         self.pbit_map = pbit_map
         self.aes_encryption = aes_encryption
@@ -101,9 +113,13 @@ class GemPortAttribute(object):
         self.weight = weight
         self.discard_policy = discard_policy
         self.discard_config = discard_config
+        self.is_multicast = is_multicast
+        self.dynamic_access_control_list = dynamic_access_control_list
+        self.static_access_control_list = static_access_control_list
+        self.multicast_gem_id = multicast_gem_id
 
 
-class DiscardConfig(object):
+class DiscardConfig:
     # Default value constants
     DEFAULT_MIN_THRESHOLD = 0
     DEFAULT_MAX_THRESHOLD = 0
@@ -117,7 +133,79 @@ class DiscardConfig(object):
         self.max_probability = max_probability
 
 
-class TechProfile(object):
+# TODO: Defaults (constants) needed for EPON here
+class QThresholds:      # for EPON
+    def __init__(self, q_threshold1=5500,
+                 q_threshold2=0,
+                 q_threshold3=0,
+                 q_threshold4=0,
+                 q_threshold5=0,
+                 q_threshold6=0,
+                 q_threshold7=0):
+        self.q_threshold1 = q_threshold1
+        self.q_threshold2 = q_threshold2
+        self.q_threshold3 = q_threshold3
+        self.q_threshold4 = q_threshold4
+        self.q_threshold5 = q_threshold5
+        self.q_threshold6 = q_threshold6
+        self.q_threshold7 = q_threshold7
+
+
+# TODO: Defaults needed for EPON here
+class UpstreamQueueAttribute:      # for EPON
+    def __init__(self, max_q_size,
+                 pbit_map,
+                 aes_encryption,
+                 traffic_type="BE",
+                 unsolicited_grant_size=0,
+                 nominal_interval=0,
+                 tolerated_poll_jitter=0,
+                 request_transmission_policy=0,
+                 num_q_sets=2,
+                 q_thresholds=None,
+                 scheduling_policy=None,    # TODO: Not yet defined
+                 priority_q=None,           # TODO: Not yet defined
+                 weight=None,               # TODO: Not yet defined
+                 discard_policy=None,       # TODO: Not yet defined
+                 discard_config=None):      # TODO: Not yet defined
+        self.max_q_size = max_q_size
+        self.pbit_map = pbit_map
+        self.aes_encryption = aes_encryption
+        self.traffic_type = traffic_type
+        self.unsolicited_grant_size = unsolicited_grant_size
+        self.nominal_interval = nominal_interval
+        self.tolerated_poll_jitter = tolerated_poll_jitter
+        self.request_transmission_policy = request_transmission_policy
+        self.num_q_sets = num_q_sets
+        self.q_thresholds = q_thresholds or QThresholds()
+        self.scheduling_policy = scheduling_policy
+        self.priority_q = priority_q
+        self.weight = weight
+        self.discard_policy = discard_policy
+        self.discard_config = discard_config
+
+
+# TODO: Defaults needed for EPON here
+class DownstreamQueueAttribute:      # for EPON
+    def __init__(self, max_q_size,      # TODO: Not yet defined
+                 pbit_map,              # TODO: Not yet defined
+                 aes_encryption,        # TODO: Not yet defined
+                 scheduling_policy,     # TODO: Not yet defined
+                 priority_q,            # TODO: Not yet defined
+                 weight,                # TODO: Not yet defined
+                 discard_policy,        # TODO: Not yet defined
+                 discard_config):       # TODO: Not yet defined
+        self.max_q_size = max_q_size
+        self.pbit_map = pbit_map
+        self.aes_encryption = aes_encryption
+        self.scheduling_policy = scheduling_policy
+        self.priority_q = priority_q
+        self.weight = weight
+        self.discard_policy = discard_policy
+        self.discard_config = discard_config
+
+
+class TechProfile:
     # Constants used in default tech profile
     DEFAULT_TECH_PROFILE_NAME = 'Default_1tcont_1gem_Profile'
     DEFAULT_VERSION = 1.0
@@ -174,19 +262,17 @@ class TechProfile(object):
                 self._kv_store = EtcdStore(
                     host, port, TechProfile.
                     KV_STORE_TECH_PROFILE_PATH_PREFIX)
-            elif self.args.backend == 'consul':
-                # KV store's IP Address and PORT
-                host, port = self.args.consul.split(':', 1)
-                self._kv_store = ConsulStore(
-                    host, port, TechProfile.
-                    KV_STORE_TECH_PROFILE_PATH_PREFIX)
 
             # self.tech_profile_instance_store = dict()
         except Exception as e:
             log.exception("exception-in-init")
             raise Exception(e)
 
-    class DefaultTechProfile(object):
+    @property
+    def kv_store(self):
+        return self._kv_store
+
+    class DefaultTechProfile:
         def __init__(self, name, **kwargs):
             self.name = name
             self.profile_type = kwargs[TechProfile.PROFILE_TYPE]
@@ -202,7 +288,7 @@ class TechProfile(object):
 
         def to_json(self):
             return json.dumps(self, default=lambda o: o.__dict__,
-                              indent=4)
+                              indent=2)
 
     def get_tp_path(self, table_id, uni_port_name):
         path = TechProfile.TECH_PROFILE_INSTANCE_PATH.format(
@@ -220,15 +306,14 @@ class TechProfile(object):
 
             if tech_profile is not None:
                 tech_profile = self._get_tech_profile(tech_profile)
-                log.debug(
-                    "Created-tech-profile-instance-with-values-from-kvstore")
+                log.debug("Created-tech-profile-instance-with-values-from-kvstore")
             else:
                 tech_profile = self._default_tech_profile()
-                log.debug(
-                    "Created-tech-profile-instance-with-default-values")
+                log.debug("Created-tech-profile-instance-with-default-values")
 
-            tech_profile_instance = TechProfileInstance(
-                uni_port_name, tech_profile, self.resource_mgr, intf_id)
+            tech_profile_instance = TechProfileInstance(uni_port_name, tech_profile,
+                                                        self.resource_mgr, intf_id,
+                                                        self._kv_store)
             self._add_tech_profile_instance(path,
                                             tech_profile_instance.to_json())
         except Exception as e:
@@ -254,17 +339,21 @@ class TechProfile(object):
             log.debug("Tech-profile-instance-after-json-to-object-conversion", path=path,
                       tech_profile_instance=tech_profile_instance)
             return tech_profile_instance
+
+        except KeyError:
+            return None
+
         except BaseException as e:
             log.debug("Tech-profile-instance-not-present-in-kvstore",
                       path=path, tech_profile_instance=None, exception=e)
             return None
 
     def delete_tech_profile_instance(self, tp_path):
-
         try:
             del self._kv_store[tp_path]
             log.debug("Delete-tech-profile-instance-success", path=tp_path)
             return True
+
         except Exception as e:
             log.debug("Delete-tech-profile-instance-failed", path=tp_path,
                       exception=e)
@@ -285,7 +374,7 @@ class TechProfile(object):
             if tech_profile != '':
                 log.debug("Get-tech-profile-success", tech_profile=tech_profile)
                 return json.loads(tech_profile)
-                # return ast.literal_eval(tech_profile)
+
         except KeyError as e:
             log.info("Get-tech-profile-failed", exception=e)
             return None
@@ -417,12 +506,12 @@ class TechProfile(object):
         :param tech_profile_instance: tech profile instance need to be added
         """
         try:
-            self._kv_store[path] = str(tech_profile_instance)
-            log.debug("Add-tech-profile-instance-success", path=path,
+            self._kv_store[path] = tech_profile_instance
+            log.debug("success", path=path,
                       tech_profile_instance=tech_profile_instance)
             return True
         except BaseException as e:
-            log.exception("Add-tech-profile-instance-failed", path=path,
+            log.exception("failed", path=path,
                           tech_profile_instance=tech_profile_instance,
                           exception=e)
         return False
@@ -432,16 +521,13 @@ class TechProfile(object):
         # upstream scheduler
         us_scheduler = openolt_pb2.Scheduler(
             direction=TechProfile.get_parameter(
-                'direction', tech_profile_instance.us_scheduler.
-                    direction),
+                'direction', tech_profile_instance.us_scheduler.direction),
             additional_bw=TechProfile.get_parameter(
-                'additional_bw', tech_profile_instance.
-                    us_scheduler.additional_bw),
+                'additional_bw', tech_profile_instance.us_scheduler.additional_bw),
             priority=tech_profile_instance.us_scheduler.priority,
             weight=tech_profile_instance.us_scheduler.weight,
             sched_policy=TechProfile.get_parameter(
-                'sched_policy', tech_profile_instance.
-                    us_scheduler.q_sched_policy))
+                'sched_policy', tech_profile_instance.us_scheduler.q_sched_policy))
 
         return us_scheduler
 
@@ -449,16 +535,13 @@ class TechProfile(object):
     def get_ds_scheduler(tech_profile_instance):
         ds_scheduler = openolt_pb2.Scheduler(
             direction=TechProfile.get_parameter(
-                'direction', tech_profile_instance.ds_scheduler.
-                    direction),
+                'direction', tech_profile_instance.ds_scheduler.direction),
             additional_bw=TechProfile.get_parameter(
-                'additional_bw', tech_profile_instance.
-                    ds_scheduler.additional_bw),
+                'additional_bw', tech_profile_instance.ds_scheduler.additional_bw),
             priority=tech_profile_instance.ds_scheduler.priority,
             weight=tech_profile_instance.ds_scheduler.weight,
             sched_policy=TechProfile.get_parameter(
-                'sched_policy', tech_profile_instance.ds_scheduler.
-                    q_sched_policy))
+                'sched_policy', tech_profile_instance.ds_scheduler.q_sched_policy))
 
         return ds_scheduler
 
@@ -471,17 +554,13 @@ class TechProfile(object):
 
         tconts = [openolt_pb2.Tcont(direction=TechProfile.get_parameter(
             'direction',
-            tech_profile_instance.
-                us_scheduler.direction),
-            alloc_id=tech_profile_instance.
-                us_scheduler.alloc_id,
+            tech_profile_instance.us_scheduler.direction),
+            alloc_id=tech_profile_instance.us_scheduler.alloc_id,
             scheduler=us_scheduler),
             openolt_pb2.Tcont(direction=TechProfile.get_parameter(
                 'direction',
-                tech_profile_instance.
-                    ds_scheduler.direction),
-                alloc_id=tech_profile_instance.
-                    ds_scheduler.alloc_id,
+                tech_profile_instance.ds_scheduler.direction),
+                alloc_id=tech_profile_instance.ds_scheduler.alloc_id,
                 scheduler=ds_scheduler)]
 
         return tconts
@@ -511,60 +590,85 @@ class TechProfile(object):
         return parameter
 
 
-class TechProfileInstance(object):
-    def __init__(self, subscriber_identifier, tech_profile, resource_mgr,
-                 intf_id, num_of_tconts=1):
-        if tech_profile is not None:
-            self.subscriber_identifier = subscriber_identifier
-            self.num_of_tconts = num_of_tconts
-            self.num_of_gem_ports = tech_profile.num_gem_ports
-            self.name = tech_profile.name
-            self.profile_type = tech_profile.profile_type
-            self.version = tech_profile.version
-            self.instance_control = tech_profile.instance_control
+class EponProfile(TechProfile):
+    def __init__(self, _resource_mgr):
+        raise NotImplemented('TODO: Not yet implemented')
 
-            # TODO: Fixed num_of_tconts to 1 per TP Instance.
-            # This may change in future
-            assert (num_of_tconts == 1)
-            # Get alloc id and gemport id using resource manager
-            alloc_id = resource_mgr.get_resource_id(intf_id,
-                                                    'ALLOC_ID',
-                                                    num_of_tconts)
-            gem_ports = resource_mgr.get_resource_id(intf_id,
-                                                     'GEMPORT_ID',
-                                                     self.num_of_gem_ports)
+    class DefaultTechProfile:
+        def __init__(self, _name, **_kwargs):
+            raise NotImplemented('TODO: Not yet implemented')
 
-            gemport_list = list()
-            if isinstance(gem_ports, int):
-                gemport_list.append(gem_ports)
-            elif isinstance(gem_ports, list):
-                for gem in gem_ports:
-                    gemport_list.append(gem)
+        def to_json(self):
+            return json.dumps(self, default=lambda o: o.__dict__,
+                              indent=2)
+
+
+class TechProfileInstance:
+    def __init__(self, subscriber_identifier, tech_profile, resource_mgr, intf_id, tp_path):
+        if tech_profile is None:
+            raise ValueError('Technology Profile not provided')
+
+        self.subscriber_identifier = subscriber_identifier
+        self.name = tech_profile.name
+        self.profile_type = tech_profile.profile_type
+        self.version = tech_profile.version
+        self.num_of_gem_ports = tech_profile.num_gem_ports
+        self.instance_control = tech_profile.instance_control
+        self.num_of_tconts = 1       # This may change in future
+
+        # Get TCONT alloc id(s) using resource manager
+        if tech_profile.instance_control.onu == 'multi-instance':
+            alloc_id = resource_mgr.get_resource_id(intf_id, 'ALLOC_ID', self.num_of_tconts)
+
+        else:       # 'single-instance'
+            existing = TechProfileInstance.get_single_instance_tp(tp_path, tech_profile.kv_store)
+            if existing is None:
+                alloc_id = resource_mgr.get_resource_id(intf_id, 'ALLOC_ID', self.num_of_tconts)
             else:
-                raise Exception("invalid-type")
+                # Use alloc ID from existing instance
+                alloc_id = existing.us_scheduler.alloc_id
 
-            self.us_scheduler = TechProfileInstance.IScheduler(
-                alloc_id, tech_profile.us_scheduler)
-            self.ds_scheduler = TechProfileInstance.IScheduler(
-                alloc_id, tech_profile.ds_scheduler)
+        # Get GEM Port id(s) using resource manager
+        gem_ports = resource_mgr.get_resource_id(intf_id, 'GEMPORT_ID', self.num_of_gem_ports)
 
-            self.upstream_gem_port_attribute_list = list()
-            self.downstream_gem_port_attribute_list = list()
-            for i in range(self.num_of_gem_ports):
-                self.upstream_gem_port_attribute_list.append(
+        if isinstance(gem_ports, int):
+            gemport_list = [gem_ports]
+        elif isinstance(gem_ports, (list, set, tuple)):
+            gemport_list = list(gem_ports)
+        else:
+            raise ValueError("invalid GEM Port type")
+
+        self.us_scheduler = TechProfileInstance.IScheduler(alloc_id, tech_profile.us_scheduler)
+        self.ds_scheduler = TechProfileInstance.IScheduler(alloc_id, tech_profile.ds_scheduler)
+
+        self.upstream_gem_port_attribute_list = list()
+        self.downstream_gem_port_attribute_list = list()
+        mcast_gem_port_attribute_list = list()
+
+        for idx in range(self.num_of_gem_ports):
+            # Add upstream GEM Ports
+            self.upstream_gem_port_attribute_list.append(
+                TechProfileInstance.IGemPortAttribute(gemport_list[idx],
+                    tech_profile.upstream_gem_port_attribute_list[idx]))
+
+            # Add unicast downstream GEM Ports (save of mcast downstream for last)
+            if tech_profile.downstream_gem_port_attribute_list[0].is_multicast:
+                mcast_gem_port_attribute_list.append(
                     TechProfileInstance.IGemPortAttribute(
-                        gemport_list[i],
-                        tech_profile.upstream_gem_port_attribute_list[
-                            i]))
+                        gemport_list[idx],
+                        tech_profile.downstream_gem_port_attribute_list[idx]))
+            else:
                 self.downstream_gem_port_attribute_list.append(
                     TechProfileInstance.IGemPortAttribute(
-                        gemport_list[i],
-                        tech_profile.downstream_gem_port_attribute_list[
-                            i]))
+                        gemport_list[idx],
+                        tech_profile.downstream_gem_port_attribute_list[idx]))
+
+        # Now fold in any multicast downstream GEM ports at end of DS list
+        self.downstream_gem_port_attribute_list.extend(mcast_gem_port_attribute_list)
 
     class IScheduler(Scheduler):
         def __init__(self, alloc_id, scheduler):
-            super(TechProfileInstance.IScheduler, self).__init__(
+            super().__init__(
                 scheduler.direction, scheduler.additional_bw,
                 scheduler.priority,
                 scheduler.weight, scheduler.q_sched_policy)
@@ -572,15 +676,54 @@ class TechProfileInstance(object):
 
     class IGemPortAttribute(GemPortAttribute):
         def __init__(self, gemport_id, gem_port_attribute):
-            super(TechProfileInstance.IGemPortAttribute, self).__init__(
+            super().__init__(
                 gem_port_attribute.pbit_map, gem_port_attribute.discard_config,
-                gem_port_attribute.aes_encryption,
-                gem_port_attribute.scheduling_policy,
-                gem_port_attribute.priority_q, gem_port_attribute.weight,
-                gem_port_attribute.max_q_size,
-                gem_port_attribute.discard_policy)
+                aes_encryption=gem_port_attribute.aes_encryption,
+                scheduling_policy=gem_port_attribute.scheduling_policy,
+                priority_q=gem_port_attribute.priority_q,
+                weight=gem_port_attribute.weight,
+                max_q_size=gem_port_attribute.max_q_size,
+                discard_policy=gem_port_attribute.discard_policy,
+                is_multicast=gem_port_attribute.is_multicast,
+                dynamic_access_control_list=gem_port_attribute.dynamic_access_control_list,
+                static_access_control_list=gem_port_attribute.static_access_control_list,
+                multicast_gem_id=gem_port_attribute.multicast_gem_id)
             self.gemport_id = gemport_id
 
     def to_json(self):
         return json.dumps(self, default=lambda o: o.__dict__,
-                          indent=4)
+                          indent=2)
+
+    @staticmethod
+    def get_single_instance_tp(tp_path, kv_store):
+        """ Gets another TP Instance for an ONU on a different UNI port for the same TP ID"""
+
+        # For example:
+        # tpPath like "service/voltha/technology_profiles/xgspon/64/pon-{0}/onu-{1}/uni-{1}"
+        # is broken into ["service/voltha/technology_profiles/xgspon/64/pon-{0}/onu-{1}" ""]
+        try:
+            raise NotImplemented('TODO: Not yet implemented fully')
+            uni_path_slice = re.split('/uni-[0-9]+$', tp_path, maxsplit=2)
+            if uni_path_slice is not None:
+                return None
+
+            kv_list = kv_store.list(uni_path_slice)
+            # uniPathSlice := regexp.MustCompile(`/uni-{[0-9]+}$`).Split(tpPath, 2)
+            # kvPairs, _ := t.config.KVBackend.List(ctx, uniPathSlice[0])
+            #
+            # // Find a valid TP Instance among all the UNIs of that ONU for the given TP ID
+            # for keyPath, kvPair := range kvPairs {
+            #     if value, err := kvstore.ToByte(kvPair.Value); err == nil {
+            #         if err = json.Unmarshal(value, &tpInst); err != nil {
+            #             logger.Errorw(ctx, "error-unmarshal-kv-pair", log.Fields{"keyPath": keyPath, "value": value})
+            #             return nil, errors.New("error-unmarshal-kv-pair")
+            #         } else {
+            #             logger.Debugw(ctx, "found-valid-tp-instance-on-another-uni", log.Fields{"keyPath": keyPath})
+            #             return &tpInst, nil
+            #         }
+            #     }
+            # }
+            return None
+
+        except Exception as _e:
+            return None

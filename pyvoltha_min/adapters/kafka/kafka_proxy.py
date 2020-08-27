@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+# pylint: skip-file
 
 import threading
 
@@ -24,7 +25,6 @@ from twisted.internet.defer import inlineCallbacks, returnValue, gatherResults, 
 from twisted.internet.threads import deferToThread
 from zope.interface import implementer
 
-from pyvoltha_min.common.utils.consulhelpers import get_endpoint_from_consul
 from pyvoltha_min.common.utils.registry import IComponent
 from .event_bus_publisher import EventBusPublisher
 
@@ -43,13 +43,12 @@ class KafkaProxy(object):
     _kafka_instance = None
 
     def __init__(self,
-                 consul_endpoint='localhost:8500',
                  kafka_endpoint='localhost:9092',
                  ack_timeout=1000,
                  max_req_attempts=10,
                  consumer_poll_timeout=10,
-                 config={}):
-
+                 config=None):
+        config = config or {}
         # return an exception if the object already exist
         if KafkaProxy._kafka_instance:
             raise Exception('Singleton exist for :{}'.format(KafkaProxy))
@@ -57,7 +56,6 @@ class KafkaProxy(object):
         log.debug('initializing', endpoint=kafka_endpoint)
         self.ack_timeout = ack_timeout
         self.max_req_attempts = max_req_attempts
-        self.consul_endpoint = consul_endpoint
         self.kafka_endpoint = kafka_endpoint
         self.config = config
         self.kclient = None
@@ -143,7 +141,7 @@ class KafkaProxy(object):
                 self.topic_any_map_lock.release()
                 log.debug('stopping-consumers-kafka-proxy-released-lock')
 
-            if len(dl):
+            if len(dl) > 0:
                 try:
                     log.info('client-producer-wait', size=len(dl))
                     d = gatherResults(dl, consumeErrors=True)
@@ -169,7 +167,7 @@ class KafkaProxy(object):
         except Exception as e:
             self.kclient = None
             self.kproducer = None
-            success = False
+            # success = False
             # self.event_bus_publisher = None
             log.exception('failed-stopped-kafka-proxy', e=e)
 
@@ -178,26 +176,9 @@ class KafkaProxy(object):
     def _get_kafka_producer(self):
 
         try:
+            _k_endpoint = self.kafka_endpoint
+            self.kproducer = _kafkaProducer({'bootstrap.servers': _k_endpoint, })
 
-            if self.kafka_endpoint.startswith('@'):
-                try:
-                    _k_endpoint = get_endpoint_from_consul(self.consul_endpoint,
-                                                           self.kafka_endpoint[1:])
-                    log.debug('found-kafka-service', endpoint=_k_endpoint)
-
-                except Exception as e:
-                    log.exception('no-kafka-service-in-consul', e=e)
-
-                    self.kproducer = None
-                    self.kclient = None
-                    return
-            else:
-                _k_endpoint = self.kafka_endpoint
-            self.kproducer = _kafkaProducer(
-                {'bootstrap.servers': _k_endpoint,
-                 }
-            )
-            pass
         except Exception as e:
             log.exception('failed-get-kafka-producer', e=e)
             return
@@ -320,9 +301,7 @@ class KafkaProxy(object):
         assert topic is not None
         assert msg is not None
 
-        # first check whether we have a kafka producer.  If there is none
-        # then try to get one - this happens only when we try to lookup the
-        # kafka service from consul
+        # first check whether we have a kafka producer.
         try:
             if self.faulty is False:
 
@@ -335,7 +314,7 @@ class KafkaProxy(object):
                         return
 
                 log.debug('sending-kafka-msg', topic=topic)
-                msgs = [msg]
+                # msgs = [msg]
 
                 if self.kproducer is not None and self.event_bus_publisher and self.faulty is False:
                     d = deferToThread(self.kproducer.produce, topic, msg, key)
@@ -364,9 +343,9 @@ class KafkaProxy(object):
                     self.stop()
                     self.stopping = False
                     log.debug('stopped-kafka-proxy')
+
                 except Exception as e:
                     log.exception('failed-stopping-kafka-proxy', e=e)
-                    pass
             else:
                 log.info('already-stopping-kafka-proxy')
             return
@@ -378,12 +357,7 @@ class KafkaProxy(object):
 
         try:
             if self.kproducer_heartbeat is None:
-                if self.kafka_endpoint.startswith('@'):
-                    _k_endpoint = get_endpoint_from_consul(self.consul_endpoint,
-                                                           self.kafka_endpoint[
-                                                           1:])
-                else:
-                    _k_endpoint = self.kafka_endpoint
+                _k_endpoint = self.kafka_endpoint
 
                 # Using 2 seconds timeout for heartbeat producer; default of 5 minutes is too long
                 self.kproducer_heartbeat = _kafkaProducer(
@@ -393,7 +367,7 @@ class KafkaProxy(object):
                 )
 
             log.debug('sending-kafka-heartbeat-message', topic=topic)
-            msgs = [msg]
+            # msgs = [msg]
 
             self.kproducer_heartbeat.produce(topic, msg, callback=self.handle_kafka_delivery_report)
 
@@ -405,7 +379,7 @@ class KafkaProxy(object):
     def check_heartbeat_delivery(self):
         try:
             if self.kproducer_heartbeat is not None:
-                msg = self.kproducer_heartbeat.poll(0)
+                _msg = self.kproducer_heartbeat.poll(0)
         except Exception as e:
             log.error('failed-to-check-heartbeat-msg-delivery', e=e)
             self.faulty = True

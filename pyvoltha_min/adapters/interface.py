@@ -101,6 +101,105 @@ class IAdapterInterface(Interface):
         :return: (Deferred) Shall be fired to acknowledge the reboot.
         """
 
+    def self_test_device(device):
+        """
+        This is called to Self a device based on a NBI call.
+        :param device: A Voltha.Device object.
+        :return: Will return result of self test
+        """
+
+    def delete_device(device):
+        """
+        This is called to delete a device from the PON based on a NBI call.
+        If the device is an OLT then the whole PON will be deleted.
+        :param device: A Voltha.Device object.
+        :return: (Deferred) Shall be fired to acknowledge the deletion.
+        """
+
+    def get_device_details(device):
+        """
+        This is called to get additional device details based on a NBI call.
+        :param device: A Voltha.Device object.
+        :return: (Deferred) Shall be fired to acknowledge the retrieval of
+        additional details.
+        """
+
+    def update_flows_bulk(device, flows, groups):
+        """
+        Called after any flow table change, but only if the device supports
+        bulk mode, which is expressed by the 'accepts_bulk_flow_update'
+        capability attribute of the device type.
+        :param device: A Voltha.Device object.
+        :param flows: An openflow_v13.Flows object
+        :param groups: An  openflow_v13.Flows object
+        :return: (Deferred or None)
+        """
+
+    def update_flows_incrementally(device, flow_changes, group_changes, flow_metadata):
+        """
+        Called after a flow table update, but only if the device supports
+        non-bulk mode, which is expressed by the 'accepts_add_remove_flow_updates'
+        capability attribute of the device type.
+        :param device: A Voltha.Device object.
+        :param flow_changes: An openflow_v13.FlowChanges object
+        :param group_changes: An openflow_v13.FlowGroupChanges object
+        :param flow_metadata: A voltha.FlowMetadata object
+        :return: (Deferred or None)
+        """
+
+    def update_pm_config(device, pm_configs):
+        """
+        Called every time a request is made to change pm collection behavior
+        :param device: A Voltha.Device object
+        :param pm_collection_config: A Pms
+        """
+
+    def receive_packet_out(device_id, egress_port_no, msg):
+        """
+        Pass a packet_out message content to adapter so that it can forward
+        it out to the device. This is only called on root devices.
+        :param device_id: device ID
+        :param egress_port: egress logical port number
+         :param msg: actual message
+        :return: None
+        """
+
+    def suppress_event(filter):
+        """
+        Inform an adapter that all incoming alarms should be suppressed
+        :param filter: A Voltha.AlarmFilter object.
+        :return: (Deferred) Shall be fired to acknowledge the suppression.
+        """
+
+    def unsuppress_event(filter):
+        """
+        Inform an adapter that all incoming alarms should resume
+        :param filter: A Voltha.AlarmFilter object.
+        :return: (Deferred) Shall be fired to acknowledge the unsuppression.
+        """
+
+    def get_ofp_device_info(device):
+        """
+        Retrieve the OLT device info. This includes the ofp_desc and
+        ofp_switch_features. The existing ofp structures can be used,
+        or all the attributes get added to the Device definition or a new proto
+        definition gets created. This API will allow the Core to create a
+        LogicalDevice associated with this device (OLT only).
+        :param device: device
+        :return: Proto Message (TBD)
+        """
+
+    def process_inter_adapter_message(msg):
+        """
+        Called when the adapter receives a message that was sent to it directly
+        from another adapter. An adapter is automatically registered for these
+        messages when creating the inter-container kafka proxy. Note that it is
+        the responsibility of the sending and receiving adapters to properly encode
+        and decode the message.
+        :param msg: Proto Message (any)
+        :return: Proto Message Response
+        """
+
     def download_image(device, request):
         """
         This is called to request downloading a specified image into
@@ -188,104 +287,10 @@ class IAdapterInterface(Interface):
         Missing
         """
 
-    def self_test_device(device):
+    def get_ext_valiue(device_id, deviceId, device, valueflag):
         """
-        This is called to Self a device based on a NBI call.
-        :param device: A Voltha.Device object.
-        :return: Will return result of self test
+        Missing
         """
-
-    def delete_device(device):
-        """
-        This is called to delete a device from the PON based on a NBI call.
-        If the device is an OLT then the whole PON will be deleted.
-        :param device: A Voltha.Device object.
-        :return: (Deferred) Shall be fired to acknowledge the deletion.
-        """
-
-    def get_device_details(device):
-        """
-        This is called to get additional device details based on a NBI call.
-        :param device: A Voltha.Device object.
-        :return: (Deferred) Shall be fired to acknowledge the retrieval of
-        additional details.
-        """
-
-    def update_flows_bulk(device, flows, groups):
-        """
-        Called after any flow table change, but only if the device supports
-        bulk mode, which is expressed by the 'accepts_bulk_flow_update'
-        capability attribute of the device type.
-        :param device: A Voltha.Device object.
-        :param flows: An openflow_v13.Flows object
-        :param groups: An  openflow_v13.Flows object
-        :return: (Deferred or None)
-        """
-
-    def update_flows_incrementally(device, flow_changes, group_changes):
-        """
-        Called after a flow table update, but only if the device supports
-        non-bulk mode, which is expressed by the 'accepts_add_remove_flow_updates'
-        capability attribute of the device type.
-        :param device: A Voltha.Device object.
-        :param flow_changes: An openflow_v13.FlowChanges object
-        :param group_changes: An openflow_v13.FlowGroupChanges object
-        :return: (Deferred or None)
-        """
-
-    def update_pm_config(device, pm_configs):
-        """
-        Called every time a request is made to change pm collection behavior
-        :param device: A Voltha.Device object
-        :param pm_collection_config: A Pms
-        """
-
-    def receive_packet_out(device_id, egress_port_no, msg):
-        """
-        Pass a packet_out message content to adapter so that it can forward
-        it out to the device. This is only called on root devices.
-        :param device_id: device ID
-        :param egress_port: egress logical port number
-         :param msg: actual message
-        :return: None
-        """
-
-    def suppress_alarm(filter):
-        """
-        Inform an adapter that all incoming alarms should be suppressed
-        :param filter: A Voltha.AlarmFilter object.
-        :return: (Deferred) Shall be fired to acknowledge the suppression.
-        """
-
-    def unsuppress_alarm(filter):
-        """
-        Inform an adapter that all incoming alarms should resume
-        :param filter: A Voltha.AlarmFilter object.
-        :return: (Deferred) Shall be fired to acknowledge the unsuppression.
-        """
-
-    def get_ofp_device_info(device):
-        """
-        Retrieve the OLT device info. This includes the ofp_desc and
-        ofp_switch_features. The existing ofp structures can be used,
-        or all the attributes get added to the Device definition or a new proto
-        definition gets created. This API will allow the Core to create a
-        LogicalDevice associated with this device (OLT only).
-        :param device: device
-        :return: Proto Message (TBD)
-        """
-
-    def process_inter_adapter_message(msg):
-        """
-        Called when the adapter receives a message that was sent to it directly
-        from another adapter. An adapter is automatically registered for these
-        messages when creating the inter-container kafka proxy. Note that it is
-        the responsibility of the sending and receiving adapters to properly encode
-        and decode the message.
-        :param msg: Proto Message (any)
-        :return: Proto Message Response
-        """
-
 
 class ICoreSouthBoundInterface(Interface):
     """

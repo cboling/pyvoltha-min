@@ -17,7 +17,6 @@
 """Resource KV store - interface between Resource Manager and backend store."""
 import structlog
 
-from pyvoltha_min.common.config.config_backend import ConsulStore
 from pyvoltha_min.common.config.config_backend import EtcdStore
 
 # KV store uses this prefix to store resource info
@@ -46,9 +45,7 @@ class ResourceKvStore(object):
 
         path = PATH_PREFIX.format(technology)
         try:
-            if backend == 'consul':
-                self._kv_store = ConsulStore(host, port, path)
-            elif backend == 'etcd':
+            if backend == 'etcd':
                 self._kv_store = EtcdStore(host, port, path)
             else:
                 self._log.error('Invalid-backend')
