@@ -81,8 +81,8 @@ class ResourceKvStore(object):
             resource = self._kv_store[path]
             self._log.debug("Got-resource-from-kv-store", path=path)
         except KeyError:
-            self._log.info("Resource-not-found-updating-resource",
-                           path=path)
+            self._log.debug("Resource-not-found-updating-resource",
+                            path=path)
         except BaseException:
             self._log.exception("Getting-resource-from-kv-store-failed",
                                 path=path)

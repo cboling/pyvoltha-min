@@ -618,15 +618,21 @@ class TechProfileInstance:
 
         # Get TCONT alloc id(s) using resource manager
         if tech_profile.instance_control.onu == 'multi-instance':
-            alloc_id = resource_mgr.get_resource_id(intf_id, 'ALLOC_ID', self.num_of_tconts)
+            # Each UNI port gets its own TCONT
+            self.alloc_id = resource_mgr.get_resource_id(intf_id, 'ALLOC_ID', self.num_of_tconts)
 
         else:       # 'single-instance'
+            # All service flows referencing this TP instance will share a single TCONT. Search
+            # any existing UNI ports of this ONU and see if they reference this TP-ID and have
+            # already allocated a TCONT
             existing = TechProfileInstance.get_single_instance_tp(tp_path, tech_profile.kv_store)
+
             if existing is None:
-                alloc_id = resource_mgr.get_resource_id(intf_id, 'ALLOC_ID', self.num_of_tconts)
+                # No, we are the first UNI on this ONU with this TPID. Get the TCONT now
+                self.alloc_id = resource_mgr.get_resource_id(intf_id, 'ALLOC_ID', self.num_of_tconts)
             else:
-                # Use alloc ID from existing instance
-                alloc_id = existing.us_scheduler.alloc_id
+                # Use alloc ID from existing UNI instance
+                self.alloc_id = existing.us_scheduler.alloc_id
 
         # Get GEM Port id(s) using resource manager
         gem_ports = resource_mgr.get_resource_id(intf_id, 'GEMPORT_ID', self.num_of_gem_ports)
@@ -638,8 +644,8 @@ class TechProfileInstance:
         else:
             raise ValueError("invalid GEM Port type")
 
-        self.us_scheduler = TechProfileInstance.IScheduler(alloc_id, tech_profile.us_scheduler)
-        self.ds_scheduler = TechProfileInstance.IScheduler(alloc_id, tech_profile.ds_scheduler)
+        self.us_scheduler = TechProfileInstance.IScheduler(self.alloc_id, tech_profile.us_scheduler)
+        self.ds_scheduler = TechProfileInstance.IScheduler(self.alloc_id, tech_profile.ds_scheduler)
 
         self.upstream_gem_port_attribute_list = list()
         self.downstream_gem_port_attribute_list = list()

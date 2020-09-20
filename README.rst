@@ -24,7 +24,7 @@ The current plan for version numbering is:
 |         |               will have been upgraded to current and       |
 |         |               unused imports/requirements removed          |
 +---------+------------------------------------------------------------+
-|   1.0.0 | Initial pre-release for VOLTHA v2.4 support several unused |
+|   2.0.0 | Initial pre-release for VOLTHA v2.4 support several unused |
 |         | or stale libraries (consul...) will be marked as being     |
 |         | deprecated, but will remain for some backwards             |
 |         | compatibility and may be untested                          |
@@ -58,21 +58,19 @@ Release History
 |         |            | were not ported, but not all missing RPCs.     |
 +---------+------------+------------------------------------------------+
 
-Detailed Release History
-~~~~~~~~~~~~~~~~~~~~~~~~
+Current Release Info
+~~~~~~~~~~~~~~~~~~~~
 
-v0.0.1 (2020-07-24)
+v2.0.0 (2020-09-20)
 ^^^^^^^^^^^^^^^^^^^
 
--  Pre-release equivalent to pyVoltha as of this date but with many ONU
-   related packages removed, some initial package upgrades, and some
-   work needed to get some basic bit rot cleaned up due to lack of
-   attention by the goland developers in keeping pyvoltha in-sync
-
-v0.0.2 (2020-07-??)
-^^^^^^^^^^^^^^^^^^^^^
-
+-  Pre-release with all but Alarms/Events and logging up to date
+   with v2.4 release of VOLTHA
+-  Much refactoring of python 2.7 code with movement toward at
+   least python 3.5 and later supported
 -  Dropped import of __future__ and six (to some extent)
 -  Removed simple ONU-only device events related to OMCI
 -  Dropped transitions, pcapy, and scapy imports (no longer required)
--  Added missing 'child_device_lost' IAdapter RPC
+-  Added missing 'child_device_lost' IAdapter RPC as well as
+   a few other IAdapter and inter-adapter API bit rot cleaned up
+

@@ -38,6 +38,7 @@ help:
 	@echo "lint            : Run pylint on package"
 	@echo
 	@echo "dist          : Create source distribution of the python package"
+	@echo "check         : run twine check on distribution"
 	@echo "upload        : Upload test version of python package to test.pypi.org"
 	@echo
 	@echo "venv          : Build local Python virtualenv"
@@ -66,7 +67,7 @@ dist:
 	rm -rf dist/
 	python setup.py sdist
 
-upload: dist
+upload: dist check
 	@ echo "Uploading sdist to test.pypi.org"
 	twine upload --repository-url https://test.pypi.org/legacy/ dist/*
 
@@ -131,6 +132,9 @@ lint-pyvoltha-min:
 
 lint-rst:
 	rst-lint --level info README.rst
+
+check:
+	twine check dist/*
 
 ######################################################################
 # Cleanup

@@ -193,7 +193,7 @@ class PONResourceManager(object):
         # Try to initialize the PON Resource Ranges from KV store based on the
         # OLT model key, if available
         if self.olt_model is None:
-            self._log.info("device-model-unavailable--not-reading-from-kv-store")
+            self._log.debug("device-model-unavailable-not-reading-from-kv-store")
             return False
 
         path = self.PON_RESOURCE_RANGE_CONFIG_PATH.format(self.olt_model)
@@ -321,7 +321,7 @@ class PONResourceManager(object):
         :param num_of_pon_ports: number of PON ports
         :param intf_ids: interfaces serviced by this manager
         """
-        self._log.info("initialize-default-resource-range-values")
+        self._log.debug("initialize-default-resource-range-values")
 
         self.update_ranges(onu_id_start_idx, onu_id_end_idx, onu_id_shared_pool_id, None,
                            alloc_id_start_idx, alloc_id_end_idx, alloc_id_shared_pool_id, None,
@@ -339,7 +339,7 @@ class PONResourceManager(object):
         Initialize resource pool for all PON ports.
         """
 
-        self._log.info("init-device-resource-pool", technology=self.technology,
+        self._log.debug("init-device-resource-pool", technology=self.technology,
                        pon_resource_ranges=self.pon_resource_ranges)
 
         for i in self.intf_ids:
@@ -475,12 +475,12 @@ class PONResourceManager(object):
             resource = self._get_resource(path)
 
             if resource is not None:
-                self._log.info("Resource-already-present-in-store", path=path)
+                self._log.debug("Resource-already-present-in-store", path=path)
                 status = True
             else:
                 resource = self._format_resource(pon_intf_id, start_idx,
                                                  end_idx)
-                self._log.info("Resource-initialized", path=path)
+                self._log.debug("Resource-initialized", path=path)
 
                 # Add resource as json in kv store.
                 result = self._kv_store.update_to_kv_store(path, resource)
@@ -1017,7 +1017,7 @@ class PONResourceManager(object):
         result = self._kv_store.get_from_kv_store(path)
         if result is None:
             return result
-        self._log.info("dumping resource", result=result)
+        self._log.debug("dumping resource", result=result)
         resource = result
 
         if resource is not None:
