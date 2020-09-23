@@ -79,11 +79,6 @@ class AdapterProxy(ContainerProxy):
         """
 
         try:
-            # validate params
-            assert msg
-            assert from_adapter
-            assert to_adapter
-
             # Build the inter adapter message
             h = InterAdapterHeader()
             h.type = type
