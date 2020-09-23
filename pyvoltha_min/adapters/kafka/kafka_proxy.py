@@ -298,9 +298,6 @@ class KafkaProxy(object):
 
     @inlineCallbacks
     def send_message(self, topic, msg, key=None):
-        assert topic is not None
-        assert msg is not None
-
         # first check whether we have a kafka producer.
         try:
             if self.faulty is False:
@@ -352,9 +349,6 @@ class KafkaProxy(object):
 
     # sending heartbeat message to check the readiness
     def send_heartbeat_message(self, topic, msg):
-        assert topic is not None
-        assert msg is not None
-
         try:
             if self.kproducer_heartbeat is None:
                 _k_endpoint = self.kafka_endpoint

@@ -511,7 +511,8 @@ class PONResourceManager(object):
             else PONResourceManager.FLOW_ID_END_IDX if resource_type == PONResourceManager.FLOW_ID \
             else PONResourceManager.UNI_ID_END_IDX if resource_type == PONResourceManager.UNI_ID \
             else None
-        assert id >= self.pon_resource_ranges[start_idx] and id <= self.pon_resource_ranges[end_idx]
+        if id < self.pon_resource_ranges[start_idx] or id > self.pon_resource_ranges[end_idx]:
+            raise ValueError('PON Resource ID out of range')
 
     def get_resource_id(self, pon_intf_id, resource_type, num_of_id=1):
         """
@@ -769,7 +770,8 @@ class PONResourceManager(object):
         value = self._kv_store.get_from_kv_store(path)
         if value is not None:
             flow_id_list = json.loads(value)
-            assert(isinstance(flow_id_list, list))
+            if not isinstance(flow_id_list, list):
+                raise ValueError('A list of Flow IDs was expected')
             if len(flow_id_list) > 0:
                 return flow_id_list
 
