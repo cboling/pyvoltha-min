@@ -256,14 +256,15 @@ class TechProfile:
             self.args = registry('main').get_args()
             self.resource_mgr = resource_mgr
 
+            # KV store's IP Address and PORT
+            host, port = self.args.kv_store_backend.split(':', 1)
+
             if self.args.backend == 'etcd':
-                # KV store's IP Address and PORT
-                host, port = self.args.etcd.split(':', 1)
                 self._kv_store = EtcdStore(
                     host, port, TechProfile.
                     KV_STORE_TECH_PROFILE_PATH_PREFIX)
-
             # self.tech_profile_instance_store = dict()
+
         except Exception as e:
             log.exception("exception-in-init")
             raise Exception(e)
