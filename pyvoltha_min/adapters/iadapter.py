@@ -178,17 +178,13 @@ class IAdapter(object):
     def update_flows_bulk(self, device, flows, groups):
         log.debug('bulk-flow-update', device_id=device.id,
                  flows=flows, groups=groups)
-        assert len(groups.items) == 0
         reactor.callLater(0, self.devices_handlers[device.id].update_flow_table,
                           flows.items)
         return device
 
     def update_flows_incrementally(self, device, flow_changes, group_changes, flow_metadata):
         log.debug('incremental-flow-update', device_id=device.id,
-                 flows=flow_changes, groups=group_changes, metadata=flow_metadata)
-        # For now, there is no support for group changes
-        assert len(group_changes.to_add.items) == 0
-        assert len(group_changes.to_remove.items) == 0
+                  flows=flow_changes, groups=group_changes, metadata=flow_metadata)
 
         handler = self.devices_handlers[device.id]
         # Remove flows

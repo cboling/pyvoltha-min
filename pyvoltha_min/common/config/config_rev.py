@@ -264,7 +264,6 @@ class ConfigRevision(object):
         if self._children is not None:
             for child_field in sorted(self._children.keys()):
                 children = self._children[child_field]
-                assert isinstance(children, list)
                 m.update(''.join(c._hash for c in children))
         return m.hexdigest()[:12]
 

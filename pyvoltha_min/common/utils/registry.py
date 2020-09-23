@@ -50,8 +50,8 @@ class Registry(object):
         self.components = OrderedDict()
 
     def register(self, name, component):
-        assert IComponent.providedBy(component)
-        assert name not in self.components
+        # assert IComponent.providedBy(component)
+        # assert name not in self.components
         self.components[name] = component
         return component
 

@@ -392,7 +392,6 @@ class IKafkaMessagingProxy:
         :return: a InterContainerMessage message type
         """
         try:
-            assert isinstance(msg_header, Header)
             response = InterContainerMessage()
             response_body = InterContainerResponseBody()
             response.header.id = msg_header.id
@@ -457,7 +456,6 @@ class IKafkaMessagingProxy:
                 return None
             result = {}
             for arg in args:
-                assert isinstance(arg, Argument)
                 result[arg.key] = arg.value
             return result
 

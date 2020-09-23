@@ -116,7 +116,8 @@ class AdapterPmMetrics(object):
 
         :return: (MetricInformation) collected metrics
         """
-        assert ' ' not in group_name,  'Spaces are not allowed in metric titles, use an underscore'
+        if ' ' in group_name:
+            raise ValueError('Spaces are not allowed in metric titles, use an underscore')
 
         if group is None:
             return None

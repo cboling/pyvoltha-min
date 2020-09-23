@@ -32,9 +32,9 @@ from netifaces import AF_INET
 
 def _get_my_primary_interface():
     gateways = ni.gateways()
-    assert 'default' in gateways, \
-        ("No default gateway on host/container, "
-         "cannot determine primary interface")
+    # assert 'default' in gateways, \
+    #     ("No default gateway on host/container, "
+    #      "cannot determine primary interface")
     default_gw_index = list(gateways['default'].keys())[0]
     # gateways[default_gw_index] has the format (example):
     # [('10.15.32.1', 'en0', True)]

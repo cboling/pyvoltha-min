@@ -575,7 +575,6 @@ class CoreProxy(ContainerProxy):
     @inlineCallbacks
     def submit_event(self, event_msg):
         try:
-            assert isinstance(event_msg, Event)
             res = yield self.kafka_proxy._send_kafka_message(self.event_default_topic, event_msg)
             returnValue(res)
         except Exception as e:

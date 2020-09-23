@@ -106,7 +106,8 @@ def merge_3way(fork_rev, src_rev, dst_rev, merge_child_func, dry_run=False):
             if dst_list == fork_list:
                 # dst branch did not change since fork
 
-                assert src_list != fork_list, 'We should not be here otherwise'
+                if src_list == fork_list:
+                    raise ValueError('We should not be here otherwise')
 
                 # the incoming (src) rev changed, and we have to apply it
                 new_children[field_name] = [

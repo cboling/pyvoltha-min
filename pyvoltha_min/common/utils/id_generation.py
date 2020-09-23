@@ -46,13 +46,14 @@ def create_cluster_logical_device_ids(core_id, switch_id):
     :return: cluster logical device id and OpenFlow datapath id
     """
     switch_id = format(switch_id, '012x')
-    core_in_hex=format(int(core_id, 16), '04x')
+    core_in_hex = format(int(core_id, 16), '04x')
     ld_id = '{}{}'.format(core_in_hex[-4:], switch_id[-12:])
     dpid_id = '{}{}'.format('0000', switch_id[-12:])
     return ld_id, int(dpid_id, 16)
 
 def is_broadcast_core_id(id):
-    assert id and len(id) == 16
+    if len(id) != 16:
+        raise ValueError('ID should be 16 characters')
     return id[:4] == BROADCAST_CORE_ID
 
 def create_empty_broadcast_id():
@@ -85,7 +86,8 @@ def create_cluster_device_id(core_id):
 
 def get_core_id_from_device_id(device_id):
     # Device id is a string and the first 4 characters represent the core_id
-    assert device_id and len(device_id) == 16
+    if len(device_id) != 16:
+        raise ValueError('ID should be 16 characters')
     # Get the leading 4 hexs and remove leading 0's
     return device_id[:4]
 
@@ -97,7 +99,8 @@ def get_core_id_from_logical_device_id(logical_device_id):
     :param logical_device_id: 
     :return: core_id string
     """
-    assert logical_device_id and len(logical_device_id) == 16
+    if len(logical_device_id) != 16:
+        raise ValueError('ID should be 16 characters')
     # Get the leading 4 hexs and remove leading 0's
     return logical_device_id[:4]
 
@@ -110,8 +113,8 @@ def get_core_id_from_datapath_id(datapath_id):
     :param datapath_id: 
     :return: core_id string
     """
-    assert datapath_id
     # Get the hex string and remove the '0x' prefix
     id_in_hex_str = hex(datapath_id)[2:]
-    assert len(id_in_hex_str) > 12
+    if len(id_in_hex_str) <= 12:
+        raise ValueError('Path should be more than 12 characters')
     return id_in_hex_str[:-12]

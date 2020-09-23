@@ -349,7 +349,7 @@ def get_inner_tag_from_write_metadata(flow):
 
 def get_actions(flow):
     """Extract list of ofp_action objects from flow spec object"""
-    assert isinstance(flow, ofp.ofp_flow_stats)
+    # assert isinstance(flow, ofp.ofp_flow_stats)
     # we have the following hard assumptions for now
     for instruction in flow.instructions:
         if instruction.type == ofp.OFPIT_APPLY_ACTIONS:
@@ -364,11 +364,11 @@ def get_default_vlan(flow):
 
 
 def get_ofb_fields(flow):
-    assert isinstance(flow, ofp.ofp_flow_stats)
-    assert flow.match.type == ofp.OFPMT_OXM
+    # assert isinstance(flow, ofp.ofp_flow_stats)
+    # assert flow.match.type == ofp.OFPMT_OXM
     ofb_fields = []
     for field in flow.match.oxm_fields:
-        assert field.oxm_class == ofp.OFPXMC_OPENFLOW_BASIC
+        # assert field.oxm_class == ofp.OFPXMC_OPENFLOW_BASIC
         ofb_fields.append(field.ofb_field)
     return ofb_fields
 

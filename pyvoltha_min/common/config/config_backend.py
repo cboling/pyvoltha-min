@@ -64,7 +64,6 @@ class EtcdStore(object):
 
     def __setitem__(self, key, value):
         try:
-            assert isinstance(value, six.string_types)
             self._kv_put(self.make_path(key), value)
         except Exception as e:
             self.log.exception('cannot-set-item', e=e)
