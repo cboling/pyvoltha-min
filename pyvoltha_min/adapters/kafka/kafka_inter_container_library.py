@@ -23,8 +23,7 @@ from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, returnValue, Deferred, \
     DeferredQueue, succeed
 from voltha_protos.inter_container_pb2 import MessageType, Argument, \
-    InterContainerRequestBody, InterContainerMessage, Header, \
-    InterContainerResponseBody, StrType
+    InterContainerRequestBody, InterContainerMessage, InterContainerResponseBody, StrType
 from zope.interface import implementer
 
 from pyvoltha_min.common.utils import asleep
@@ -40,6 +39,7 @@ ARG_FROM_TOPIC = 'fromTopic'
 
 class KafkaMessagingError(Exception):
     def __init__(self, error):
+        super().__init__()
         self.error = error
 
 

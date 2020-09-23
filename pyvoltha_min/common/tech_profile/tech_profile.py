@@ -257,12 +257,10 @@ class TechProfile:
             self.resource_mgr = resource_mgr
 
             # KV store's IP Address and PORT
-            host, port = self.args.kv_store_backend.split(':', 1)
-
-            if self.args.backend == 'etcd':
-                self._kv_store = EtcdStore(
-                    host, port, TechProfile.
-                    KV_STORE_TECH_PROFILE_PATH_PREFIX)
+            host, port = self.args.kv_store_address.split(':', 1)
+            self._kv_store = EtcdStore(
+                host, port, TechProfile.
+                KV_STORE_TECH_PROFILE_PATH_PREFIX)
             # self.tech_profile_instance_store = dict()
 
         except Exception as e:

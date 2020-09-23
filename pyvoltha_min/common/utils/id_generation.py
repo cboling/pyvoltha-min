@@ -23,9 +23,9 @@ BROADCAST_CORE_ID=hex(0xFFFF)[2:]
 
 def get_next_core_id(current_id_in_hex_str):
     """
-    :param current_id_in_hex_str: a hex string of the maximum core id 
+    :param current_id_in_hex_str: a hex string of the maximum core id
     assigned without the leading 0x characters
-    :return: current_id_in_hex_str + 1 in hex string 
+    :return: current_id_in_hex_str + 1 in hex string
     """
     if not current_id_in_hex_str or current_id_in_hex_str == '':
         return '0001'
@@ -35,7 +35,7 @@ def get_next_core_id(current_id_in_hex_str):
 
 def create_cluster_logical_device_ids(core_id, switch_id):
     """
-    Creates a logical device id and an OpenFlow datapath id that is unique 
+    Creates a logical device id and an OpenFlow datapath id that is unique
     across the Voltha cluster.
     The returned logical device id  represents a 64 bits integer where the
     lower 48 bits is the switch id and the upper 16 bits is the core id.   For
@@ -66,8 +66,8 @@ def create_empty_broadcast_id():
 
 def create_cluster_id():
     """
-    Returns an id that is common across all voltha instances.  The id  
-    is a str of 64 bits.  The lower 48 bits refers to an id specific to that 
+    Returns an id that is common across all voltha instances.  The id
+    is a str of 64 bits.  The lower 48 bits refers to an id specific to that
     object while the upper 16 bits refers a broadcast core_id
     :return: An common id across all Voltha instances
     """
@@ -76,7 +76,7 @@ def create_cluster_id():
 def create_cluster_device_id(core_id):
     """
     Creates a device id that is unique across the Voltha cluster.
-    The device id is a str of 64 bits.  The lower 48 bits refers to the 
+    The device id is a str of 64 bits.  The lower 48 bits refers to the
     device id while the upper 16 bits refers to the core id.
     :param core_id: string
     :return: cluster device id
@@ -93,10 +93,10 @@ def get_core_id_from_device_id(device_id):
 
 
 def get_core_id_from_logical_device_id(logical_device_id):
-    """ 
-    Logical Device id is a string and the first 4 characters represent the 
+    """
+    Logical Device id is a string and the first 4 characters represent the
     core_id
-    :param logical_device_id: 
+    :param logical_device_id:
     :return: core_id string
     """
     if len(logical_device_id) != 16:
@@ -110,7 +110,7 @@ def get_core_id_from_datapath_id(datapath_id):
     datapath id is a uint64 where:
         - low 48 bits -> switch_id
         - high 16 bits -> core id
-    :param datapath_id: 
+    :param datapath_id:
     :return: core_id string
     """
     # Get the hex string and remove the '0x' prefix
