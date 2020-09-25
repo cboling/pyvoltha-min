@@ -41,25 +41,23 @@ Installation instruction
 
    pip install pyvoltha-min
 
-Release History
----------------
+Release Notes
+-------------
 
-+---------+------------+------------------------------------------------+
-| Version | Date       | Notes                                          |
-+=========+============+================================================+
-| v0.0.1  | 2020-07-24 | Initial pypy pre-release available. This is    |
-|         |            | primarily for testing out pip install support  |
-|         |            | and is not expected to be useful outside of    |
-|         |            | that.                                          |
-+---------+------------+------------------------------------------------+
-| v0.0.2  | 2020-0x-xx | Cleanup of some low-hanging imports, pylint    |
-|         |            | issues, and known 'unused' ONU adapter alarms. |
-|         |            | Includes some additional IAdapter RPCs that    |
-|         |            | were not ported, but not all missing RPCs.     |
-+---------+------------+------------------------------------------------+
+v2.0.2 (2020-xx-xx)
+^^^^^^^^^^^^^^^^^^^
 
-Current Release Info
-~~~~~~~~~~~~~~~~~~~~
+-  This release is a work in progress.  Notes will be added below as updates
+   are made.
+-  Default KPI subcategory is now OLT and can be set with a kwargs if needed
+   for some other type
+
+v2.0.1 (2020-09-24)
+^^^^^^^^^^^^^^^^^^^
+
+-  Move etcd/kafka address values to be similar to what OpenOLT uses
+-  Small amount of 'assert' cleanup flagged by bandit
+
 
 v2.0.0 (2020-09-20)
 ^^^^^^^^^^^^^^^^^^^

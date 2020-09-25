@@ -22,7 +22,7 @@ from voltha_protos.events_pb2 import EventType, EventCategory, EventSubCategory
 from voltha_protos.events_pb2 import KpiEvent2, KpiEventType, MetricInformation, MetricMetaData
 
 
-class AdapterPmMetrics(object):
+class AdapterPmMetrics:     # pylint: disable=too-many-arguments, invalid-name
     """
     Base class for Device Adapter PM Metrics Manager
 
@@ -64,7 +64,7 @@ class AdapterPmMetrics(object):
                                        AdapterPmMetrics.DEFAULT_COLLECTION_FREQUENCY)
         self._event = "KPI_EVENT"
         self._category = EventCategory.EQUIPMENT
-        self._sub_category = EventSubCategory.ONU
+        self._sub_category = kwargs.get('subcategory', EventSubCategory.OLT)
         self.grouped = grouped
         self.freq_override = grouped and freq_override
         self.lc = None
@@ -132,7 +132,7 @@ class AdapterPmMetrics(object):
         if now is None:
             return None     # No metrics available at this time for collection
 
-        for (metric, t) in names:
+        for (metric, _t) in names:
             if config[metric].type == PmConfig.CONTEXT and hasattr(group, metric):
                 context[metric] = str(getattr(group, metric))
 
@@ -207,16 +207,14 @@ class AdapterPmMetrics(object):
                                                        self._sub_category,
                                                        self._event,
                                                        raised_ts)
-        if len(data):
+        if len(data) > 0:
             try:
                 # TODO: Existing adapters use the KpiEvent, if/when all existing
                 #       adapters use the shared KPI library, we may want to
                 #       deprecate the KPIEvent
-                event_body = KpiEvent2(
-                             type=KpiEventType.slice,
-                             ts=arrow.utcnow().float_timestamp,
-                             slice_data=data
-                             )
+                event_body = KpiEvent2(type=KpiEventType.slice,
+                                       ts=arrow.utcnow().float_timestamp,
+                                       slice_data=data)
                 self.event_mgr.send_event(event_header, event_body)
 
             except Exception as e:
