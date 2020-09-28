@@ -44,13 +44,19 @@ Installation instruction
 Release Notes
 -------------
 
-v2.0.2 (2020-xx-xx)
+v2.0.2 (2020-09-28)
 ^^^^^^^^^^^^^^^^^^^
 
--  This release is a work in progress.  Notes will be added below as updates
-   are made.
 -  Default KPI subcategory is now OLT and can be set with a kwargs if needed
    for some other type
+-  Moved to latest version of protobuf module
+-  Added golang-equivalent Endpoint Manager in effort to determine endpoint
+   of a device for interadapter-messages.  Turns out there is a flaw in the
+   design and is reliant upon use of a specific golang 3rd party hashing
+   algorythm which may not be available to a python program.  Discussions
+   on the VOLTHA slack channel have been started and a JIRA may be issued
+   in the near future.
+-  Added 'list' function for ectd library
 
 v2.0.1 (2020-09-24)
 ^^^^^^^^^^^^^^^^^^^

@@ -12,7 +12,7 @@ etcd3           == 0.12.0
 jsonpatch       == 1.26
 netaddr         == 0.8.0
 netifaces       == 0.10.9
-protobuf        == 3.12.2       # 3.13.0
+protobuf        == 3.13.0
 simplejson      == 3.17.2
 structlog       == 20.1.0
 txaioetcd       == 0.3.0        # 18.10.2

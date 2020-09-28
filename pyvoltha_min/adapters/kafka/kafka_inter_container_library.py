@@ -49,7 +49,6 @@ class IKafkaMessagingProxy:
 
     def __init__(self,
                  kafka_host_port,
-                 kv_store,
                  default_topic,
                  group_id_prefix,
                  target_cls):
@@ -69,7 +68,6 @@ class IKafkaMessagingProxy:
 
         log.debug("Initializing-KafkaProxy")
         self.kafka_host_port = kafka_host_port
-        self.kv_store = kv_store
         self.default_topic = default_topic
         self.default_group_id = "_".join((group_id_prefix, default_topic))
         self.target_cls = target_cls

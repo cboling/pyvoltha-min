@@ -59,6 +59,21 @@ class TwistedEtcdStore:
         deferred.addErrback(failure)
         return deferred
 
+    def list(self, key,  keys_only=False):
+
+        def success(results):
+            if results:
+                return results
+            return False
+
+        def failure(exception):
+            raise exception
+
+        deferred = threads.deferToThread(self._etcd.get_prefix, self.make_path(key), keys_only=keys_only)
+        deferred.addCallback(success)
+        deferred.addErrback(failure)
+        return deferred
+
     def watch(self, key, callback):
 
         def success(results):

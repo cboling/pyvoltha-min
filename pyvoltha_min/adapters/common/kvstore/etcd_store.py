@@ -36,3 +36,7 @@ class EtcdStore(object):
     def delete(self, key):
         success = self._etcd.delete(self.make_path(key))
         return success
+
+    def list(self, key):
+        success = self._etcd.get_prefix(self.make_path(key))
+        return success
