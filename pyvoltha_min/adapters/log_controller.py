@@ -16,6 +16,7 @@
 import os
 
 import structlog
+from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, returnValue
 
 from .common.kvstore.twisted_etcd_store import TwistedEtcdStore         # pylint: disable=relative-beyond-top-level
@@ -114,9 +115,8 @@ class LogController:
         yield self.etcd_client.watch(self.global_config_path, self.watch_callback)
         yield self.etcd_client.watch(self.component_config_path, self.watch_callback)
 
-    def watch_callback(self, event):
-        self.log.debug('event', event=event)
-        self.process_log_config_change()
+    def watch_callback(self, _event):
+        reactor.callFromThread(self.process_log_config_change)
 
     @inlineCallbacks
     def process_log_config_change(self):
