@@ -44,6 +44,11 @@ Installation instruction
 Release Notes
 -------------
 
+v2.0.3 (2020-09-30)
+^^^^^^^^^^^^^^^^^^^
+
+- Call to etcd callback needs to be placed onto reactor thread
+
 v2.0.2 (2020-09-28)
 ^^^^^^^^^^^^^^^^^^^
 
