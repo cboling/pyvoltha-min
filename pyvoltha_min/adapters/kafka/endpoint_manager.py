@@ -39,7 +39,6 @@ class EndpointManager:
         self._services = dict()                        # map[string]*service
         # Device type below is Type as reported by 'voltctl adapter list'
         self._device_type_service_map = dict()         # Device Type (str) -> map[string]string
-        pass
 
     @inlineCallbacks
     def get_endpoint(self, device_id, service_type):
@@ -118,7 +117,7 @@ class EndpointManager:
 
         for device_type, srv_type in self._device_type_service_map.items():
             if srv_type == service_type:
-                returnValue(service, device_type)
+                returnValue((service, device_type))
 
         returnValue((None, ''))
 
