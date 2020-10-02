@@ -21,19 +21,20 @@ from jsonpatch import JsonPatch
 from jsonpatch import make_patch
 from voltha_protos import meta_pb2
 
-from pyvoltha_min.common.config.config_branch import ConfigBranch
-from pyvoltha_min.common.config.config_event_bus import ConfigEventBus
-from pyvoltha_min.common.config.config_proxy import CallbackType, ConfigProxy
-from pyvoltha_min.common.config.config_rev import is_proto_message, children_fields, \
-    access_rights
-from pyvoltha_min.common.config.config_rev_persisted import PersistedConfigRevision
-from pyvoltha_min.common.config.merge_3way import merge_3way
-from pyvoltha_min.common.utils.json_format import MessageToDict
+from .config_branch import ConfigBranch
+from .config_event_bus import ConfigEventBus
+from .config_proxy import CallbackType, ConfigProxy
+from .config_rev import is_proto_message, children_fields, access_rights
+from .config_rev_persisted import PersistedConfigRevision
+from .merge_3way import merge_3way
+from ..utils.json_format import MessageToDict
 
 log = structlog.get_logger()
 
-def message_to_dict(m):
-    return MessageToDict(m, True, True, False)
+# pylint: disable=protected-access
+
+def message_to_dict(msg):
+    return MessageToDict(msg, True, True, False)
 
 
 def check_access_violation(new_msg, old_msg):
@@ -50,13 +51,13 @@ def check_access_violation(new_msg, old_msg):
 
 
 def find_rev_by_key(revs, keyname, value):
-    for i, rev in enumerate(revs):
+    for idx, rev in enumerate(revs):
         if getattr(rev._config._data, keyname) == value:
-            return i, rev
+            return idx, rev
     raise KeyError('key {}={} not found'.format(keyname, value))
 
 
-class ConfigNode(object):
+class ConfigNode:
     """
     Represents a configuration node which can hold a number of revisions
     of the configuration for this node.
@@ -110,16 +111,16 @@ class ConfigNode(object):
                 if field.key:
                     keys_seen = set()
                     children[field_name] = lst = []
-                    for v in field_value:
-                        rev = self._mknode(v, txid=txid).latest
-                        key = getattr(v, field.key)
+                    for val in field_value:
+                        rev = self._mknode(val, txid=txid).latest
+                        key = getattr(val, field.key)
                         if key in keys_seen:
                             raise ValueError('Duplicate key "{}"'.format(key))
                         lst.append(rev)
                         keys_seen.add(key)
                 else:
                     children[field_name] = [
-                        self._mknode(v, txid=txid).latest for v in field_value]
+                        self._mknode(val, txid=txid).latest for val in field_value]
             else:
                 children[field_name] = [
                     self._mknode(field_value, txid=txid).latest]
@@ -141,12 +142,12 @@ class ConfigNode(object):
     def latest(self):
         return self._branches[None]._latest
 
-    def __getitem__(self, hash):
-        return self._branches[None]._revs[hash]
+    def __getitem__(self, hash_val):
+        return self._branches[None]._revs[hash_val]
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ get operation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def get(self, path=None, hash=None, depth=0, deep=False, txid=None):
+    def get(self, path=None, hash_val=None, depth=0, deep=False, txid=None):
 
         # depth preparation
         if deep:
@@ -161,8 +162,8 @@ class ConfigNode(object):
         branch = self._branches.get(txid, None) or self._branches[None]
 
         # determine rev
-        if hash is not None:
-            rev = branch._revs[hash]
+        if hash_val is not None:
+            rev = branch._revs[hash_val]
         else:
             rev = branch.latest
 
@@ -186,28 +187,28 @@ class ConfigNode(object):
                     _, child_rev = find_rev_by_key(children, field.key, key)
                     child_node = child_rev.node
                     return child_node._get(child_rev, path, depth)
-                else:
-                    # we are the node of interest
-                    response = []
-                    for child_rev in children:
-                        child_node = child_rev.node
-                        value = child_node._do_get(child_rev, depth)
-                        response.append(value)
-                    return response
-            else:
-                if path:
-                    raise LookupError(
-                        'Cannot index into container with no key defined')
+
+                # we are the node of interest
                 response = []
-                for child_rev in rev._children[name]:
+                for child_rev in children:
                     child_node = child_rev.node
                     value = child_node._do_get(child_rev, depth)
                     response.append(value)
                 return response
-        else:
-            child_rev = rev._children[name][0]
-            child_node = child_rev.node
-            return child_node._get(child_rev, path, depth)
+
+            if path:
+                raise LookupError(
+                    'Cannot index into container with no key defined')
+            response = []
+            for child_rev in rev._children[name]:
+                child_node = child_rev.node
+                value = child_node._do_get(child_rev, depth)
+                response.append(value)
+            return response
+
+        child_rev = rev._children[name][0]
+        child_node = child_rev.node
+        return child_node._get(child_rev, path, depth)
 
     def _do_get(self, rev, depth):
         msg = rev.get(depth)
@@ -255,7 +256,7 @@ class ConfigNode(object):
                     # as the child_rev address then do not clear the hash
                     if new_child_rev != child_rev:
                         log.debug('clear-hash',
-                             hash=new_child_rev.hash, object_ref=new_child_rev)
+                                  hash=new_child_rev.hash, object_ref=new_child_rev)
                         new_child_rev.clear_hash()
                     return branch._latest
                 if getattr(new_child_rev.data, field.key) != key:
@@ -264,17 +265,16 @@ class ConfigNode(object):
                 rev = rev.update_children(name, children, branch)
                 self._make_latest(branch, rev)
                 return rev
-            else:
-                raise ValueError('Cannot index into container with no keys')
 
-        else:
-            child_rev = rev._children[name][0]
-            child_node = child_rev.node
-            new_child_rev = child_node.update(
-                path, data, strict, txid, mk_branch)
-            rev = rev.update_children(name, [new_child_rev], branch)
-            self._make_latest(branch, rev)
-            return rev
+            raise ValueError('Cannot index into container with no keys')
+
+        child_rev = rev._children[name][0]
+        child_node = child_rev.node
+        new_child_rev = child_node.update(
+            path, data, strict, txid, mk_branch)
+        rev = rev.update_children(name, [new_child_rev], branch)
+        self._make_latest(branch, rev)
+        return rev
 
     def _do_update(self, branch, data, strict):
         if not isinstance(data, self._type):
@@ -293,8 +293,8 @@ class ConfigNode(object):
             self._make_latest(branch, rev,
                               ((CallbackType.POST_UPDATE, rev.data),))
             return rev
-        else:
-            return branch._latest
+
+        return branch._latest
 
     def _make_latest(self, branch, rev, change_announcements=()):
         # Update the latest branch only when the hash between the previous
@@ -367,27 +367,26 @@ class ConfigNode(object):
                     self._make_latest(branch, rev,
                                       ((CallbackType.POST_ADD, data),))
                     return rev
-                else:
-                    # adding to non-keyed containers not implemented yet
-                    raise ValueError('Cannot add to non-keyed container')
-            else:
-                if field.key:
-                    # need to escalate
-                    key, _, path = path.partition('/')
-                    key = field.key_from_str(key)
-                    children = copy(rev._children[name])
-                    idx, child_rev = find_rev_by_key(children, field.key, key)
-                    child_node = child_rev.node
-                    new_child_rev = child_node.add(path, data, txid, mk_branch)
-                    children[idx] = new_child_rev
-                    rev = rev.update_children(name, children, branch)
-                    self._make_latest(branch, rev)
-                    return rev
-                else:
-                    raise ValueError(
-                        'Cannot index into container with no keys')
-        else:
-            raise ValueError('Cannot add to non-container field')
+
+                # adding to non-keyed containers not implemented yet
+                raise ValueError('Cannot add to non-keyed container')
+
+            if field.key:
+                # need to escalate
+                key, _, path = path.partition('/')
+                key = field.key_from_str(key)
+                children = copy(rev._children[name])
+                idx, child_rev = find_rev_by_key(children, field.key, key)
+                child_node = child_rev.node
+                new_child_rev = child_node.add(path, data, txid, mk_branch)
+                children[idx] = new_child_rev
+                rev = rev.update_children(name, children, branch)
+                self._make_latest(branch, rev)
+                return rev
+
+            raise ValueError('Cannot index into container with no keys')
+
+        raise ValueError('Cannot add to non-container field')
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~ remove operation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -408,6 +407,7 @@ class ConfigNode(object):
         if field.is_container:
             if not path:
                 raise ValueError("Cannot remove without a key")
+
             if field.key:
                 key, _, path = path.partition('/')
                 key = field.key_from_str(key)
@@ -421,25 +421,25 @@ class ConfigNode(object):
                     rev = rev.update_children(name, children, branch)
                     self._make_latest(branch, rev)
                     return rev
+
+                # need to remove from this very node
+                children = copy(rev._children[name])
+                idx, child_rev = find_rev_by_key(children, field.key, key)
+                if self._proxy is not None:
+                    data = child_rev.data
+                    self._proxy.invoke_callbacks(
+                        CallbackType.PRE_REMOVE, data)
+                    post_anno = ((CallbackType.POST_REMOVE, data),)
                 else:
-                    # need to remove from this very node
-                    children = copy(rev._children[name])
-                    idx, child_rev = find_rev_by_key(children, field.key, key)
-                    if self._proxy is not None:
-                        data = child_rev.data
-                        self._proxy.invoke_callbacks(
-                            CallbackType.PRE_REMOVE, data)
-                        post_anno = ((CallbackType.POST_REMOVE, data),)
-                    else:
-                        post_anno = ((CallbackType.POST_REMOVE, child_rev.data),)
-                    del children[idx]
-                    rev = rev.update_children(name, children, branch)
-                    self._make_latest(branch, rev, post_anno)
-                    return rev
-            else:
-                raise ValueError('Cannot remove from non-keyed container')
-        else:
-            raise ValueError('Cannot remove non-conatiner field')
+                    post_anno = ((CallbackType.POST_REMOVE, child_rev.data),)
+                del children[idx]
+                rev = rev.update_children(name, children, branch)
+                self._make_latest(branch, rev, post_anno)
+                return rev
+
+            raise ValueError('Cannot remove from non-keyed container')
+
+        raise ValueError('Cannot remove non-conatiner field')
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Branching ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -490,16 +490,16 @@ class ConfigNode(object):
         rev2 = branch[hash2] if hash2 else branch._latest
         if rev1.hash == rev2.hash:
             return JsonPatch([])
-        else:
-            dict1 = message_to_dict(rev1.data)
-            dict2 = message_to_dict(rev2.data)
-            return make_patch(dict1, dict2)
+
+        dict1 = message_to_dict(rev1.data)
+        dict2 = message_to_dict(rev2.data)
+        return make_patch(dict1, dict2)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~ Tagging utility ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def tag(self, tag, hash=None):
+    def tag(self, tag, hash_val=None):
         branch = self._branches[None]  # tag only what has been committed
-        rev = branch._latest if hash is None else branch._revs[hash]
+        rev = branch._latest if hash_val is None else branch._revs[hash_val]
         self._tags[tag] = rev
         self.persist_tags()
         return self
@@ -532,9 +532,9 @@ class ConfigNode(object):
         branch = self._branches[None]
         keep = set(rev.hash for rev in six.itervalues(self._tags))
         keep.add(branch._latest.hash)
-        for hash in branch._revs.keys():
-            if hash not in keep:
-                del branch._revs[hash]
+        for hash_val in branch._revs.keys():
+            if hash_val not in keep:
+                del branch._revs[hash_val]
         return self
 
     def persist_tags(self):
@@ -548,13 +548,11 @@ class ConfigNode(object):
         for field_name, field in children_fields(self._type).items():
             field_value = getattr(data, field_name)
             if field.is_container:
-                if len(field_value):
-                    raise NotImplementedError(
-                        'Cannot update external children')
+                if len(field_value) > 0:
+                    raise NotImplementedError('Cannot update external children')
             else:
                 if data.HasField(field_name):
-                    raise NotImplementedError(
-                        'Cannot update externel children')
+                    raise NotImplementedError('Cannot update externel children')
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~ Node proxy ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -584,10 +582,9 @@ class ConfigNode(object):
 
             raise ValueError('Cannot index into container with no keys')
 
-        else:
-            child_rev = rev._children[name][0]
-            child_node = child_rev.node
-            return child_node._get_proxy(path, root, full_path, exclusive)
+        child_rev = rev._children[name][0]
+        child_node = child_rev.node
+        return child_node._get_proxy(path, root, full_path, exclusive)
 
     def _mk_proxy(self, root, full_path, exclusive):
         if self._proxy is None:

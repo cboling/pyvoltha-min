@@ -18,11 +18,11 @@ from pyvoltha_min.adapters.extensions.events.adapter_events import DeviceEventBa
 
 class OnuDiscoveryEvent(DeviceEventBase):
     def __init__(self, event_mgr, pon_id, onu_id, serial_number, onu_device_id, raised_ts):
-        super(OnuDiscoveryEvent, self).__init__(event_mgr, raised_ts, object_type='ONU Discovery',
-                                                event='ONU_DISCOVERY',
-                                                resource_id=pon_id,
-                                                category=EventCategory.EQUIPMENT,
-                                                sub_category=EventSubCategory.PON)
+        super().__init__(event_mgr, raised_ts, object_type='ONU Discovery',
+                         event='ONU_DISCOVERY',
+                         resource_id=pon_id,
+                         category=EventCategory.EQUIPMENT,
+                         sub_category=EventSubCategory.PON)
         self._pon_id = pon_id
         self._onu_id = onu_id
         self._serial_number = serial_number

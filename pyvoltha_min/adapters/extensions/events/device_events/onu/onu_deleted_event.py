@@ -18,15 +18,15 @@ from pyvoltha_min.adapters.extensions.events.adapter_events import DeviceEventBa
 
 
 class OnuDeletedEvent(DeviceEventBase):
+    # pylint: disable=too-many-arguments
     def __init__(self, event_mgr, device_id, pon_id, onu_serial_number,
                  reg_id, olt_serial_number, raised_ts, ipv4_address=None,
                  onu_id=None):
-        super(OnuDeletedEvent, self).__init__(event_mgr, raised_ts, object_type='ONU',
-                                             event='ONU_DELETED',
-                                             resource_id=pon_id,
-                                             category=EventCategory.COMMUNICATION,
-                                             sub_category=EventSubCategory.PON,
-                                             )
+        super().__init__(event_mgr, raised_ts, object_type='ONU',
+                         event='ONU_DELETED',
+                         resource_id=pon_id,
+                         category=EventCategory.COMMUNICATION,
+                         sub_category=EventSubCategory.PON)
 
         self._pon_id = pon_id
         self._onu_id = onu_id

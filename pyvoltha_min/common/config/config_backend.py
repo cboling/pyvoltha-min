@@ -15,14 +15,13 @@
 import codecs
 
 import etcd3
-import six
 import structlog
 from twisted.internet.defer import inlineCallbacks
 
 from pyvoltha_min.common.utils.asleep import asleep
 
 
-class EtcdStore(object):
+class EtcdStore:
     """ Config kv store for etcd with a cache for quicker subsequent reads
 
         TODO: This will block the reactor. Should either change
@@ -49,18 +48,16 @@ class EtcdStore(object):
         return '{}/{}'.format(self._path_prefix, key)
 
     def __getitem__(self, key):
-        (value, meta) = self._kv_get(self.make_path(key))
+        (value, _meta) = self._kv_get(self.make_path(key))
         if value is not None:
             return value
-        else:
-            raise KeyError(key)
+        raise KeyError(key)
 
     def __contains__(self, key):
-        (value, meta) = self._kv_get(self.make_path(key))
+        (value, _meta) = self._kv_get(self.make_path(key))
         if value is not None:
             return True
-        else:
-            return False
+        return False
 
     def __setitem__(self, key, value):
         try:

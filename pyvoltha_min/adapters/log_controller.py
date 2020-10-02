@@ -110,17 +110,17 @@ class LogController:
                                   self.component_config_path,
                                   initial_default_loglevel.upper())
 
-        self.process_log_config_change()
+        self.process_log_config_change('startup')
 
         yield self.etcd_client.watch(self.global_config_path, self.watch_callback)
         yield self.etcd_client.watch(self.component_config_path, self.watch_callback)
 
-    def watch_callback(self, _event):
-        reactor.callFromThread(self.process_log_config_change)
+    def watch_callback(self, event):
+        reactor.callFromThread(self.process_log_config_change, event)
 
     @inlineCallbacks
-    def process_log_config_change(self):
-        self.log.debug("log-change-occurred")
+    def process_log_config_change(self, event=None):
+        self.log.info("log-change-occurred", event=event)
 
         global_default_level = yield self.get_global_loglevel()
         level = yield self.get_component_loglevel(global_default_level)
