@@ -11,17 +11,21 @@
 # --------------------------------------------------------------------------#
 
 from voltha_protos.events_pb2 import EventCategory, EventSubCategory
+from voltha_protos.common_pb2 import OperStatus
 
 from pyvoltha_min.adapters.extensions.events.adapter_events import DeviceEventBase
 
 
 class OltIndicationEvent(DeviceEventBase):
     def __init__(self, event_mgr, oper_status, raised_ts):
-        super().__init__(event_mgr, raised_ts, object_type='olt',
+        super().__init__(event_mgr, raised_ts, object_type='OLT Down Indication',
                          event='OLT_DOWN_INDICATION',
                          category=EventCategory.COMMUNICATION,
                          sub_category=EventSubCategory.OLT)
-        self._oper_status = oper_status
+        if not isinstance(oper_status, OperStatus):
+            raise TypeError('oper_status should be of type OperStatus')
+
+        self._oper_status = 'up' if oper_status == OperStatus.ACTIVE else 'down'
 
     def get_context_data(self):
         return {'oper-state': self._oper_status}

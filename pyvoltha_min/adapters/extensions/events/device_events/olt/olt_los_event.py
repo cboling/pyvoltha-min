@@ -17,15 +17,13 @@ from pyvoltha_min.adapters.extensions.events.adapter_events import DeviceEventBa
 
 
 class OltLosEvent(DeviceEventBase):
-    def __init__(self, event_mgr, intf_id, port_type_name, raised_ts):
-        super().__init__(event_mgr, raised_ts, object_type='olt',
-                         event='OLT_LOS',
+    def __init__(self, event_mgr, intf_id, raised_ts):
+        super().__init__(event_mgr, raised_ts, object_type='OLT LOS',
+                         event='OLT_LOSS_OF_SIGNAL',
                          category=EventCategory.COMMUNICATION,
                          sub_category=EventSubCategory.OLT)
         # Added port type to indicate if alarm was on NNI or PON
         self._intf_id = intf_id
-        self._port_type_name = port_type_name
 
     def get_context_data(self):
-        return {'olt-intf-id:': self._intf_id,
-                'olt-port-type-name': self._port_type_name}
+        return {'intf-id:': str(self._intf_id)}

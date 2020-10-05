@@ -13,12 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from enum import IntEnum
 import structlog
 from twisted.internet.defer import inlineCallbacks
 from voltha_protos.events_pb2 import Event, EventType, EventCategory, EventSubCategory, DeviceEvent, EventHeader
 
 log = structlog.get_logger()
-
 
 # TODO: In the device adapter, the following events are still TBD
 #       (Taken from openolt_events)
@@ -31,6 +31,12 @@ log = structlog.get_logger()
 # onu_tiwi_ind
 # onu_activation_fail_ind
 # onu_processing_error_ind
+
+
+class AdapterEventStatus(IntEnum):
+    CLEAR_EVENT = 0             # Alarm clearing
+    RAISE_EVENT = 1             # Alarm going active
+    EVENT = 2                   # Notification/on-shot event
 
 
 class AdapterEvents:
@@ -46,7 +52,6 @@ class AdapterEvents:
         :param logical_device_id: (str) Logical Device that the device is a member of
         :param serial_number: (str) Serial number of the device(OLT) that created this instance
         """
-        self.lc = None
         self.type_version = "0.1"
         self.device_id = device_id
         self.core_proxy = core_proxy
@@ -69,15 +74,14 @@ class AdapterEvents:
 
     def get_event_header(self, _type, category, sub_category, event, raised_ts):
         """
-
         :return: (dict) Event header
         """
         hdr = EventHeader(id=self.format_id(event),
-                           category=category,
-                           sub_category=sub_category,
-                           type=_type,
-                           type_version=self.type_version)
-        hdr.raised_ts.FromSeconds(raised_ts),
+                          category=category,
+                          sub_category=sub_category,
+                          type=_type,
+                          type_version=self.type_version)
+        hdr.raised_ts.FromSeconds(raised_ts)
         hdr.reported_ts.GetCurrentTime()
         return hdr
 
@@ -94,16 +98,16 @@ class AdapterEvents:
             self.log.debug('send_event')
 
             if event_header.type == EventType.DEVICE_EVENT:
-               event = Event(header=event_header, device_event=event_body)
+                event = Event(header=event_header, device_event=event_body)
             elif event_header.type == EventType.KPI_EVENT:
-               event = Event(header=event_header, kpi_event=event_body)
+                event = Event(header=event_header, kpi_event=event_body)
             elif event_header.type == EventType.KPI_EVENT2:
-               event = Event(header=event_header, kpi_event2=event_body)
+                event = Event(header=event_header, kpi_event2=event_body)
             elif event_header.type == EventType.CONFIG_EVENT:
-               event = Event(header=event_header, config_event=event_body)
+                event = Event(header=event_header, config_event=event_body)
 
             if event is not None:
-               yield self.core_proxy.submit_event(event)
+                yield self.core_proxy.submit_event(event)
 
         except Exception as e:
             self.log.exception('failed-to-send-event', e=e)
@@ -111,9 +115,10 @@ class AdapterEvents:
         log.debug('event-sent-to-kafka', event_type=event_header.type)
 
 
-class DeviceEventBase(object):
+class DeviceEventBase:
     """Base class for device events"""
-    def __init__(self, event_mgr, raised_ts, object_type, 
+    # pylint: disable=too-many-arguments
+    def __init__(self, event_mgr, raised_ts, object_type,
                  event, resource_id=None,
                  category=EventCategory.EQUIPMENT,
                  sub_category=EventSubCategory.PON):
@@ -139,27 +144,35 @@ class DeviceEventBase(object):
         self._resource_id = resource_id
         self.raised_ts = raised_ts
 
-    def format_description(self, _object, device_event, status):
+    @staticmethod
+    def _format_description(object_type, device_event, status):
         """
         Format the textual description field of this event
 
-        :param _object: ()
+        :param object_type: (str) Better textual description of the event type
         :param device_event: (str) The name of the event such as 'Discover' or 'LOS'
-        :param status: (bool) If True, the event is active (it is being raised)
+        :param status: (AdapterEventStatus) Status/type of event
 
         :return: (str) Event description
         """
-        return '{} Event - {} - {}'.format(_object.upper(),
-                                           device_event.upper(),
-                                           'Raised' if status else 'Cleared')
+        state = {
+            AdapterEventStatus.CLEAR_EVENT: 'Cleared',
+            AdapterEventStatus.RAISE_EVENT: 'Raised',
+            AdapterEventStatus.EVENT: 'event'
+        }.get(status)
 
-    def get_device_event_data(self, status):
+        if state is None:
+            raise TypeError('status should be an AdapterEventStatus enumeration:{}'.format(status))
+
+        return '{} Event - {} - {}'.format(object_type.upper(), device_event.upper(), state)
+
+    def _get_device_event_data(self, status):
         """
         Get the event specific data and format it into a dictionary.  When the event
         is being sent to the event bus, this dictionary provides a majority of the
         fields for the events.
 
-        :param status: (bool) True if the event is active/raised
+        :param status: (AdapterEventStatus) Type/state of event
         :return: (dict) Event data
         """
         context_data = self.get_context_data()
@@ -172,16 +185,16 @@ class DeviceEventBase(object):
         current_context["serial-number"] = self.event_mgr.serial_number
 
         return DeviceEvent(resource_id=self.event_mgr.device_id,
-                           device_event_name="{}_{}".format(self._event, "RAISE_EVENT"),
-                           description=self.format_description(self._object_type, self._event, status),
+                           device_event_name="{}_{}".format(self._event, status.name),
+                           description=self._format_description(self._object_type, self._event, status),
                            context=current_context)
 
-    def get_context_data(self):
+    def get_context_data(self):  # pylint: disable=no-self-use
         """
         Get event specific context data. If an event has specific data to specify, it is
         included in the context field in the published event
 
-        :return: (dict) Dictionary with event specific context data
+        :return: (dict) Dictionary (str -> str) with event specific context data
         """
         return {}   # NOTE: You should override this if needed
 
@@ -191,6 +204,5 @@ class DeviceEventBase(object):
         """
         event_header = self.event_mgr.get_event_header(EventType.DEVICE_EVENT, self._category,
                                                        self._sub_category, self._event, self.raised_ts)
-        device_event_data = self.get_device_event_data(status)
+        device_event_data = self._get_device_event_data(status)
         self.event_mgr.send_event(event_header, device_event_data)
-

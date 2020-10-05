@@ -30,8 +30,8 @@ class OnuDiscoveryEvent(DeviceEventBase):
 
     def get_context_data(self):
         return {
-            'onu-id': self._onu_id,
-            'intf-id': self._pon_id,
-            'serial-number': self._serial_number,
-            'onu-device-id': self._onu_device_id
+            'onu-id': str(self._onu_id),
+            'intf-id': str(self._pon_id),
+            'serial-number': str(self._serial_number),
+            'onu-device-id': str(self._onu_device_id)
         }

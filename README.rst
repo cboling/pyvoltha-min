@@ -44,13 +44,14 @@ Installation instruction
 Release Notes
 -------------
 
-- Deprecation of HeartBeat Event, now called OLT Indication
-- Correct subcategory for OLT LOS Event (was ONU, should be OLT)
-- A small amount of pylint cleanup and python 3 updates
-
-v2.0.4 (2020-10-02)
+v2.0.4 (2020-10-05)
 ^^^^^^^^^^^^^^^^^^^
 
+- Deprecation of HeartBeat Event, now called OLT Indication
+- Correct subcategory for OLT LOS Event (was ONU, should be OLT)
+- Corrected Device Events for OLT LOS, OLT Port Down, OLT Down, Dying
+  Gasp, and PON Interface Down events for the OLT (VOLTHA v2.x format)
+- A small amount of pylint cleanup and python 3 updates
 - Call to etcd callback needs to be placed onto reactor thread
 
 v2.0.3 (2020-09-30)

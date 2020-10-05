@@ -67,7 +67,7 @@ class AdapterPmMetrics:     # pylint: disable=too-many-arguments, invalid-name
         self._sub_category = kwargs.get('subcategory', EventSubCategory.OLT)
         self.grouped = grouped
         self.freq_override = grouped and freq_override
-        self.lc = None
+        self.lp_callback = None
         self.pm_group_metrics = dict()      # name -> PmGroupConfig
         self.max_skew = max_skew
 
@@ -88,16 +88,16 @@ class AdapterPmMetrics:     # pylint: disable=too-many-arguments, invalid-name
         if callback is None:
             callback = self.collect_and_publish_metrics
 
-        if self.lc is None:
-            self.lc = LoopingCall(callback)
+        if self.lp_callback is None:
+            self.lp_callback = LoopingCall(callback)
 
         if self.default_freq > 0:
-            self.lc.start(interval=self.default_freq / 10)
+            self.lp_callback.start(interval=self.default_freq / 10)
 
     def stop_collector(self):
         """ Stop the collection loop"""
-        if self.lc is not None and self.default_freq > 0:
-            self.lc.stop()
+        if self.lp_callback is not None and self.default_freq > 0:
+            self.lp_callback.stop()
 
     def collect_group_metrics(self, group_name, group, names, config):
         """

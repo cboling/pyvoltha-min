@@ -27,6 +27,7 @@ class OltPmMetrics(AdapterPmMetrics):
     specific PM (OMCI, PON, UNI) is supported in encapsulated classes accessible
     from this object
     """
+    # pylint: disable=too-many-arguments
     def __init__(self, event_mgr, core_proxy, device_id, logical_device_id, serial_number,
                  grouped=False, freq_override=False, **kwargs):
         """
@@ -125,8 +126,8 @@ class OltPmMetrics(AdapterPmMetrics):
             if self.default_freq != pm_config.default_freq:
                 # Update the callback to the new frequency.
                 self.default_freq = pm_config.default_freq
-                self.lc.stop()
-                self.lc.start(interval=self.default_freq / 10)
+                self.lp_callback.stop()
+                self.lp_callback.start(interval=self.default_freq / 10)
 
             if self.max_skew != pm_config.max_skew:
                 self.max_skew = pm_config.max_skew
@@ -138,13 +139,13 @@ class OltPmMetrics(AdapterPmMetrics):
                         group_config.enabled = group.enabled
             else:
                 msg = 'There are no independent OLT metrics, only group metrics at this time'
-                raise NotImplemented(msg)
+                raise NotImplementedError(msg)
 
         except Exception as e:
             self.log.exception('update-failure', e=e)
             raise
 
-    def make_proto(self, pm_config=None):
+    def make_proto(self, pm_config=None):   # pylint: disable=too-many-branches
         if pm_config is None:
             pm_config = PmConfigs(id=self.device_id, default_freq=self.default_freq,
                                   grouped=self.grouped,
@@ -192,52 +193,51 @@ class OltPmMetrics(AdapterPmMetrics):
             pm_gem_stats = pm_config if have_pon else None
 
         if have_nni:
-            for m in sorted(self.nni_metrics_config):
-                pm = self.nni_metrics_config[m]
+            for metric in sorted(self.nni_metrics_config):
+                pmetric = self.nni_metrics_config[metric]
                 if not self.grouped:
-                    if pm.name in metrics:
+                    if pmetric.name in metrics:
                         continue
-                    metrics.add(pm.name)
-                pm_ether_stats.metrics.extend([PmConfig(name=pm.name,
-                                                        type=pm.type,
-                                                        enabled=pm.enabled)])
+                    metrics.add(pmetric.name)
+                pm_ether_stats.metrics.extend([PmConfig(name=pmetric.name,
+                                                        type=pmetric.type,
+                                                        enabled=pmetric.enabled)])
         if have_pon:
-            for m in sorted(self.pon_metrics_config):
-                pm = self.pon_metrics_config[m]
+            for metric in sorted(self.pon_metrics_config):
+                pmetric = self.pon_metrics_config[metric]
                 if not self.grouped:
-                    if pm.name in metrics:
+                    if pmetric.name in metrics:
                         continue
-                    metrics.add(pm.name)
-                pm_pon_stats.metrics.extend([PmConfig(name=pm.name,
-                                                      type=pm.type,
-                                                      enabled=pm.enabled)])
+                    metrics.add(pmetric.name)
+                pm_pon_stats.metrics.extend([PmConfig(name=pmetric.name,
+                                                      type=pmetric.type,
+                                                      enabled=pmetric.enabled)])
 
-            for m in sorted(self.onu_metrics_config):
-                pm = self.onu_metrics_config[m]
+            for metric in sorted(self.onu_metrics_config):
+                pmetric = self.onu_metrics_config[metric]
                 if not self.grouped:
-                    if pm.name in metrics:
+                    if pmetric.name in metrics:
                         continue
-                    metrics.add(pm.name)
-                pm_onu_stats.metrics.extend([PmConfig(name=pm.name,
-                                                      type=pm.type,
-                                                      enabled=pm.enabled)])
+                    metrics.add(pmetric.name)
+                pm_onu_stats.metrics.extend([PmConfig(name=pmetric.name,
+                                                      type=pmetric.type,
+                                                      enabled=pmetric.enabled)])
 
-            for m in sorted(self.gem_metrics_config):
-                pm = self.gem_metrics_config[m]
+            for metric in sorted(self.gem_metrics_config):
+                pmetric = self.gem_metrics_config[metric]
                 if not self.grouped:
-                    if pm.name in metrics:
+                    if pmetric.name in metrics:
                         continue
-                    metrics.add(pm.name)
-                pm_gem_stats.metrics.extend([PmConfig(name=pm.name,
-                                                      type=pm.type,
-                                                      enabled=pm.enabled)])
+                    metrics.add(pmetric.name)
+                pm_gem_stats.metrics.extend([PmConfig(name=pmetric.name,
+                                                      type=pmetric.type,
+                                                      enabled=pmetric.enabled)])
         if self.grouped:
-            pm_config.groups.extend([stats for stats in
-                                     self.pm_group_metrics.values()])
+            pm_config.groups.extend(self.pm_group_metrics.values())
 
         return pm_config
 
-    def collect_metrics(self, data=None):
+    def collect_metrics(self, data=None):   # pylint: disable=too-many-branches
         """
         Collect metrics for this adapter.
 

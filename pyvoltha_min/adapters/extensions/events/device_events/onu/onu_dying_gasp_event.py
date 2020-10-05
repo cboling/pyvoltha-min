@@ -17,16 +17,14 @@ from ...adapter_events import DeviceEventBase
 
 
 class OnuDyingGaspEvent(DeviceEventBase):
-    def __init__(self, event_mgr, onu_id, intf_id, serial_number, raised_ts):
-        super(OnuDyingGaspEvent, self).__init__(event_mgr, raised_ts, object_type='onu DYING_GASP',
+    def __init__(self, event_mgr, onu_id, intf_id, raised_ts):
+        super(OnuDyingGaspEvent, self).__init__(event_mgr, raised_ts, object_type='ONU Dying Gasp',
                                                 event='ONU_DYING_GASP',
-                                                category=EventCategory.EQUIPMENT,
-                                                sub_category=EventSubCategory.ONU)
+                                                category=EventCategory.COMMUNICATION,
+                                                sub_category=EventSubCategory.PON)
         self._onu_id = onu_id
         self._intf_id = intf_id
-        self._serial_number = serial_number
 
     def get_context_data(self):
-        return {'onu-id': self._onu_id,
-                'onu-intf-id': self._intf_id,
-                'onu-serial-number': self._serial_number}
+        return {'onu-id': str(self._onu_id),
+                'intf-id': str(self._intf_id)}
