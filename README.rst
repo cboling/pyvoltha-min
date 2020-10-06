@@ -1,5 +1,14 @@
-PyVOLTHA-min
-============
+==================
+ ``PyVOLTHA-min``
+==================
+
+.. image:: https://img.shields.io/pypi/v/pyvoltha-min.svg
+    :target: https://pypi.python.org/pypi/pyvoltha-min/
+    :alt: Latest Version
+
+.. image:: https://img.shields.io/pypi/pyversions/pyvoltha-min.svg
+        :target: https://pypi.org/project/pyvoltha-min/
+        :alt: Supported Python versions
 
 PyVOLTHA-min is an updated pyVOLTHA package that provides a collection
 of python 3.x libraries used to create an VOLTHA OLT device adapter
@@ -43,6 +52,13 @@ Installation instruction
 
 Release Notes
 -------------
+
+v2.0.5 (2020-10-xx)
+^^^^^^^^^^^^^^^^^^^
+
+- Fix bad check on OperStatus type. Always passed in as an int
+- Fix log keyword bug, should not use 'event' in call
+
 
 v2.0.4 (2020-10-05)
 ^^^^^^^^^^^^^^^^^^^

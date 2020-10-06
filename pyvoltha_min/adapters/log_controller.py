@@ -120,7 +120,7 @@ class LogController:
 
     @inlineCallbacks
     def process_log_config_change(self, event=None):
-        self.log.info("log-change-occurred", event=event)
+        self.log.info("log-change-occurred", event_info=event)
 
         global_default_level = yield self.get_global_loglevel()
         level = yield self.get_component_loglevel(global_default_level)
