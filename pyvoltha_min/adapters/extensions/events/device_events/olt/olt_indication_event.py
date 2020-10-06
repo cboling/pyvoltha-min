@@ -22,8 +22,6 @@ class OltIndicationEvent(DeviceEventBase):
                          event='OLT_DOWN_INDICATION',
                          category=EventCategory.COMMUNICATION,
                          sub_category=EventSubCategory.OLT)
-        if not isinstance(oper_status, OperStatus):
-            raise TypeError('oper_status should be of type OperStatus')
 
         self._oper_status = 'up' if oper_status == OperStatus.ACTIVE else 'down'
 

@@ -46,9 +46,9 @@ class OltPmMetrics(AdapterPmMetrics):
                               'nni-ports': List of objects that provide NNI (northbound) port statistics
                               'pon-ports': List of objects that provide PON port statistics
         """
-        super(OltPmMetrics, self).__init__(event_mgr, core_proxy, device_id, logical_device_id, serial_number,
-                                           grouped=grouped, freq_override=freq_override,
-                                           **kwargs)
+        super().__init__(event_mgr, core_proxy, device_id, logical_device_id, serial_number,
+                         grouped=grouped, freq_override=freq_override,
+                         **kwargs)
 
         # PM Config Types are COUNTER, GAUGE, and STATE
         self.nni_pm_names = {
@@ -174,9 +174,12 @@ class OltPmMetrics(AdapterPmMetrics):
                                              group_freq=self.default_freq,
                                              enabled=True)
 
+                # pm_gem_stats = PmGroupConfig(group_name='GEM',
+                #                              group_freq=self.default_freq,
+                #                              enabled=True)
                 pm_gem_stats = PmGroupConfig(group_name='GEM',
                                              group_freq=self.default_freq,
-                                             enabled=True)
+                                             enabled=False)
 
                 self.pm_group_metrics[pm_pon_stats.group_name] = pm_pon_stats
                 self.pm_group_metrics[pm_onu_stats.group_name] = pm_onu_stats

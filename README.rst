@@ -53,12 +53,12 @@ Installation instruction
 Release Notes
 -------------
 
-v2.0.5 (2020-10-xx)
+v2.0.5 (2020-10-06)
 ^^^^^^^^^^^^^^^^^^^
 
 - Fix bad check on OperStatus type. Always passed in as an int
 - Fix log keyword bug, should not use 'event' in call
-
+- Disable GEM Port statistics until we are ready for them
 
 v2.0.4 (2020-10-05)
 ^^^^^^^^^^^^^^^^^^^

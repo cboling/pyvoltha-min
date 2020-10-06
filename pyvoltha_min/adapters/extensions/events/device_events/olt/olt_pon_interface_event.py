@@ -22,10 +22,6 @@ class OltPonInterfaceDownEvent(DeviceEventBase):
                          event='OLT_PON_INTERFACE_DOWN',
                          category=EventCategory.COMMUNICATION,
                          sub_category=EventSubCategory.OLT)
-
-        if not isinstance(oper_status, OperStatus):
-            raise TypeError('oper_status should be of type OperStatus')
-
         # Added port type to indicate if alarm was on NNI or PON
         self._intf_id = str(intf_id)
         self._oper_status = 'up' if oper_status == OperStatus.ACTIVE else 'down'
