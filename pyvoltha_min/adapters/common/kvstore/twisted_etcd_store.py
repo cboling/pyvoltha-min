@@ -36,8 +36,9 @@ class TwistedEtcdStore:
             (value, _meta) = results
             return value
 
-        def failure(exception):
-            raise exception
+        def failure(reason):
+            log.info('get-failure', error=reason)
+            return reason
 
         deferred = threads.deferToThread(self._etcd.get, self.make_path(key))
         deferred.addCallback(success)
@@ -51,8 +52,9 @@ class TwistedEtcdStore:
                 return results
             return False
 
-        def failure(exception):
-            raise exception
+        def failure(reason):
+            log.info('set-failure', error=reason)
+            return reason
 
         deferred = threads.deferToThread(self._etcd.put, self.make_path(key), value)
         deferred.addCallback(success)
@@ -66,8 +68,9 @@ class TwistedEtcdStore:
                 return results
             return False
 
-        def failure(exception):
-            raise exception
+        def failure(reason):
+            log.info('list-failure', error=reason)
+            return reason
 
         deferred = threads.deferToThread(self._etcd.get_prefix, self.make_path(key), keys_only=keys_only)
         deferred.addCallback(success)
@@ -79,8 +82,9 @@ class TwistedEtcdStore:
         def success(results):
             return results
 
-        def failure(exception):
-            raise exception
+        def failure(reason):
+            log.info('watch-failure', error=reason)
+            return reason
 
         deferred = threads.deferToThread(self._etcd.add_watch_callback, self.make_path(key), callback)
         deferred.addCallback(success)
@@ -96,8 +100,9 @@ class TwistedEtcdStore:
                 return results
             return False
 
-        def failure(exception):
-            raise exception
+        def failure(reason):
+            log.info('delete-failure', error=reason)
+            return reason
 
         deferred = threads.deferToThread(self._etcd.delete, self.make_path(key))
         deferred.addCallback(success, key)
@@ -113,8 +118,9 @@ class TwistedEtcdStore:
                 return results
             return False
 
-        def failure(exception):
-            raise exception
+        def failure(reason):
+            log.info('delete-prefix-failure', error=reason)
+            return reason
 
         if prefix is not None and len(prefix) > 0:
             prefix = self.make_path(prefix)
