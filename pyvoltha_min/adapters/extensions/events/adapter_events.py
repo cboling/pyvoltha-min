@@ -158,7 +158,7 @@ class DeviceEventBase:
         state = {
             AdapterEventStatus.CLEAR_EVENT: 'Cleared',
             AdapterEventStatus.RAISE_EVENT: 'Raised',
-            AdapterEventStatus.EVENT: 'event'
+            AdapterEventStatus.EVENT: 'Event'
         }.get(status)
 
         if state is None:
