@@ -96,7 +96,7 @@ class AdapterPmMetrics:     # pylint: disable=too-many-arguments, invalid-name
 
     def stop_collector(self):
         """ Stop the collection loop"""
-        if self.lp_callback is not None and self.default_freq > 0:
+        if self.lp_callback is not None and self.lp_callback.running and self.default_freq > 0:
             self.lp_callback.stop()
 
     def collect_group_metrics(self, group_name, group, names, config):
