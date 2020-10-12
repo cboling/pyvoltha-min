@@ -21,13 +21,15 @@ log = structlog.get_logger()
 
 class TwistedEtcdStore:
 
-    def __init__(self, host, port, path_prefix):
-        self._etcd = etcd3.client(host=host, port=port)
+    def __init__(self, host, port, path_prefix, timeout=None):
+        self._etcd = etcd3.client(host=host, port=port, timeout=timeout)
         self.host = host
         self.port = port
         self._path_prefix = path_prefix
 
     def make_path(self, key):
+        if key is None:
+            return self._path_prefix
         return '{}/{}'.format(self._path_prefix, key)
 
     def get(self, key):
@@ -93,6 +95,9 @@ class TwistedEtcdStore:
 
     def delete(self, key):
         log.info('entry', key=key)
+
+        if key is None or len(key) == 0:
+            raise ValueError("key-not-provided: '{}'".format(key))
 
         def success(results, k):
             log.info('delete-success', results=results, key=k)
