@@ -52,10 +52,12 @@ class OltPmMetrics(AdapterPmMetrics):
 
         # PM Config Types are COUNTER, GAUGE, and STATE
         self.nni_pm_names = {
-            ('intf_id', PmConfig.CONTEXT),      # Physical device interface ID/Port number
-
-            ('admin_state', PmConfig.STATE),
-            ('oper_status', PmConfig.STATE),
+            ('oltid', PmConfig.CONTEXT),       # Physical device interface ID/Port number
+            ('devicetype', PmConfig.CONTEXT),
+            ('portlabel', PmConfig.CONTEXT),
+            ('portno', PmConfig.CONTEXT),
+            # ('admin_state', PmConfig.STATE),
+            # ('oper_status', PmConfig.STATE),
 
             ('rx_bytes', PmConfig.COUNTER),
             ('rx_packets', PmConfig.COUNTER),
@@ -74,11 +76,13 @@ class OltPmMetrics(AdapterPmMetrics):
             ('bip_errors', PmConfig.COUNTER),
         }
         self.pon_pm_names = {
-            ('intf_id', PmConfig.CONTEXT),        # Physical device port number (PON)
-            ('pon_id', PmConfig.CONTEXT),         # PON ID (0..n)
+            ('oltid', PmConfig.CONTEXT),  # Physical device interface ID/Port number
+            ('devicetype', PmConfig.CONTEXT),
+            ('portlabel', PmConfig.CONTEXT),
+            ('portno', PmConfig.CONTEXT),
 
-            ('admin_state', PmConfig.STATE),
-            ('oper_status', PmConfig.STATE),
+            # ('admin_state', PmConfig.STATE),
+            # ('oper_status', PmConfig.STATE),
             ('rx_packets', PmConfig.COUNTER),
             ('rx_bytes', PmConfig.COUNTER),
             ('tx_packets', PmConfig.COUNTER),
@@ -88,19 +92,19 @@ class OltPmMetrics(AdapterPmMetrics):
             ('closest_onu_distance', PmConfig.GAUGE)
         }
         self.onu_pm_names = {
-            ('intf_id', PmConfig.CONTEXT),        # Physical device port number (PON)
-            ('pon_id', PmConfig.CONTEXT),
-            ('onu_id', PmConfig.CONTEXT),
+            # ('intf_id', PmConfig.CONTEXT),        # Physical device port number (PON)
+            # ('pon_id', PmConfig.CONTEXT),
+            # ('onu_id', PmConfig.CONTEXT),
 
             ('fiber_length', PmConfig.GAUGE),
             ('equalization_delay', PmConfig.GAUGE),
             ('rssi', PmConfig.GAUGE),
         }
         self.gem_pm_names = {
-            ('intf_id', PmConfig.CONTEXT),        # Physical device port number (PON)
-            ('pon_id', PmConfig.CONTEXT),
-            ('onu_id', PmConfig.CONTEXT),
-            ('gem_id', PmConfig.CONTEXT),
+            # ('intf_id', PmConfig.CONTEXT),        # Physical device port number (PON)
+            # ('pon_id', PmConfig.CONTEXT),
+            # ('onu_id', PmConfig.CONTEXT),
+            # ('gem_id', PmConfig.CONTEXT),
 
             ('alloc_id', PmConfig.GAUGE),
             ('rx_packets', PmConfig.COUNTER),
