@@ -53,6 +53,16 @@ Installation instruction
 Release Notes
 -------------
 
+v2.0.6 (2020-10-12)
+^^^^^^^^^^^^^^^^^^^
+
+- Check to not stop looping call in stats if not running. Prevents an assert
+- EtcStore errback should return the reason, not raise an assert
+- Additional work on logger level and components in preparation for v2.5+ support
+- Update to reported KPI Metrics to better match what OpenOLT supports in v2.4
+- Allow None to be passed as key to TwistedEtcdStore operations to select the base client path
+  and allow a timeout when initializing the etcd client.
+
 v2.0.5 (2020-10-06)
 ^^^^^^^^^^^^^^^^^^^
 
