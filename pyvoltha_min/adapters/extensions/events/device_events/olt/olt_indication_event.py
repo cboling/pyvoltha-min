@@ -17,9 +17,11 @@ from pyvoltha_min.adapters.extensions.events.adapter_events import DeviceEventBa
 
 
 class OltIndicationEvent(DeviceEventBase):
+    event_name = 'OLT_DOWN_INDICATION'
+
     def __init__(self, event_mgr, oper_status, raised_ts):
         super().__init__(event_mgr, raised_ts, object_type='OLT Down Indication',
-                         event='OLT_DOWN_INDICATION',
+                         event=self.event_name,
                          category=EventCategory.COMMUNICATION,
                          sub_category=EventSubCategory.OLT)
 
@@ -27,3 +29,13 @@ class OltIndicationEvent(DeviceEventBase):
 
     def get_context_data(self):
         return {'oper-state': self._oper_status}
+
+    def to_dict(self):
+        """ Serialize to a dictionary """
+        data = super().to_dict()
+        data['oper_status'] = self._oper_status
+        return data
+
+    @staticmethod
+    def from_dict(data, event_mgr):
+        return OltIndicationEvent(event_mgr, data['oper_status'], data['raised_ts'])

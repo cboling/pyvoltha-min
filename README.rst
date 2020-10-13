@@ -53,6 +53,12 @@ Installation instruction
 Release Notes
 -------------
 
+v2.0.7 (2020-10-13)
+^^^^^^^^^^^^^^^^^^^
+
+- Added support for Device Event serialization to support HA reconciliation after
+  a container restart
+
 v2.0.6 (2020-10-12)
 ^^^^^^^^^^^^^^^^^^^
 

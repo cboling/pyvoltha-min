@@ -114,9 +114,28 @@ class AdapterEvents:
             raise
         log.debug('event-sent-to-kafka', event_type=event_header.type)
 
+    @staticmethod
+    def event_from_dict(event, event_mgr):
+        """ Deserialize from a dictionary """
+        # pylint: disable=import-outside-toplevel
+        # NOTE: Autoclear events are not serialized
+        from .device_events.olt.olt_indication_event import OltIndicationEvent
+        from .device_events.olt.olt_los_event import OltLosEvent
+        from .device_events.olt.olt_pon_interface_event import OltPonInterfaceDownEvent
+
+        decoder = {
+            OltIndicationEvent.event_name: OltIndicationEvent.from_dict,
+            OltLosEvent.event_name: OltLosEvent.from_dict,
+            OltPonInterfaceDownEvent.event_name: OltPonInterfaceDownEvent.from_dict,
+        }.get(event['object_type'], lambda _: None)
+
+        return decoder(event, event_mgr)
+
 
 class DeviceEventBase:
     """Base class for device events"""
+    event_name = 'base_class'
+
     # pylint: disable=too-many-arguments
     def __init__(self, event_mgr, raised_ts, object_type,
                  event, resource_id=None,
@@ -206,3 +225,10 @@ class DeviceEventBase:
                                                        self._sub_category, self._event, self.raised_ts)
         device_event_data = self._get_device_event_data(status)
         self.event_mgr.send_event(event_header, device_event_data)
+
+    def to_dict(self):
+        """ Serialize to a dictionary """
+        return {
+            'event': self._event,
+            'raised_ts': self.raised_ts,
+        }
