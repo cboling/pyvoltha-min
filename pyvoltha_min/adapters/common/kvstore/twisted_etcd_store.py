@@ -15,6 +15,8 @@
 import structlog
 import etcd3
 from twisted.internet import threads
+from twisted.internet.defer import CancelledError
+from twisted.python.failure import Failure
 
 log = structlog.get_logger()
 
@@ -39,7 +41,10 @@ class TwistedEtcdStore:
             return value
 
         def failure(reason):
-            log.info('get-failure', error=reason)
+            if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
+                log.info('get-cancelled')
+            else:
+                log.info('get-failure', error=reason)
             return reason
 
         deferred = threads.deferToThread(self._etcd.get, self.make_path(key))
@@ -55,7 +60,10 @@ class TwistedEtcdStore:
             return False
 
         def failure(reason):
-            log.info('set-failure', error=reason)
+            if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
+                log.info('set-cancelled')
+            else:
+                log.info('set-failure', error=reason)
             return reason
 
         deferred = threads.deferToThread(self._etcd.put, self.make_path(key), value)
@@ -71,7 +79,10 @@ class TwistedEtcdStore:
             return False
 
         def failure(reason):
-            log.info('list-failure', error=reason)
+            if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
+                log.info('list-cancelled')
+            else:
+                log.info('list-failure', error=reason)
             return reason
 
         deferred = threads.deferToThread(self._etcd.get_prefix, self.make_path(key), keys_only=keys_only)
@@ -85,7 +96,10 @@ class TwistedEtcdStore:
             return results
 
         def failure(reason):
-            log.info('watch-failure', error=reason)
+            if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
+                log.info('watch-cancelled')
+            else:
+                log.info('watch-failure', error=reason)
             return reason
 
         deferred = threads.deferToThread(self._etcd.add_watch_callback, self.make_path(key), callback)
@@ -106,7 +120,10 @@ class TwistedEtcdStore:
             return False
 
         def failure(reason):
-            log.info('delete-failure', error=reason)
+            if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
+                log.info('delete-cancelled')
+            else:
+                log.info('delete-failure', error=reason)
             return reason
 
         deferred = threads.deferToThread(self._etcd.delete, self.make_path(key))
@@ -124,7 +141,10 @@ class TwistedEtcdStore:
             return False
 
         def failure(reason):
-            log.info('delete-prefix-failure', error=reason)
+            if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
+                log.info('delete-prefix-cancelled')
+            else:
+                log.info('delete-prefix-failure', error=reason)
             return reason
 
         if prefix is not None and len(prefix) > 0:
