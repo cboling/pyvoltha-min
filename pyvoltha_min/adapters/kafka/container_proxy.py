@@ -123,6 +123,7 @@ class ContainerProxy:
             try:
                 res = yield cb
                 returnValue(res)
+
             except TimeOutError as e:
                 log.warn('invoke-timeout', e=e)
                 if retry == max_retry:
@@ -130,3 +131,7 @@ class ContainerProxy:
                 retry += 1
                 if retry == max_retry:
                     to_topic = self.remote_topic
+
+            except Exception as e:
+                log.exception('send-request-failed', e=e)
+                raise
