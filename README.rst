@@ -52,6 +52,12 @@ Installation instruction
 
 Release Notes
 -------------
+v2.0.8 (2020-10-22)
+^^^^^^^^^^^^^^^^^^^
+
+- For async/twisted ETCD client, differentiate between a cancelled async request and true failure
+- Start method for PM metrics will check to for an existing running LoopingCall before attempting
+  to start the loop (which would assert otherwise if already running)
 
 v2.0.7 (2020-10-13)
 ^^^^^^^^^^^^^^^^^^^
