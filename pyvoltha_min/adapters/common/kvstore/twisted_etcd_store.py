@@ -42,9 +42,9 @@ class TwistedEtcdStore:
 
         def failure(reason):
             if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
-                log.info('get-cancelled')
+                log.debug('get-cancelled')
             else:
-                log.info('get-failure', error=reason)
+                log.info('get-failure', error=reason, key=key)
             return reason
 
         deferred = threads.deferToThread(self._etcd.get, self.make_path(key))
@@ -61,9 +61,9 @@ class TwistedEtcdStore:
 
         def failure(reason):
             if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
-                log.info('set-cancelled')
+                log.debug('set-cancelled')
             else:
-                log.info('set-failure', error=reason)
+                log.info('set-failure', error=reason, key=key, value=value)
             return reason
 
         deferred = threads.deferToThread(self._etcd.put, self.make_path(key), value)
@@ -71,7 +71,7 @@ class TwistedEtcdStore:
         deferred.addErrback(failure)
         return deferred
 
-    def list(self, key,  keys_only=False):
+    def list(self, key, keys_only=False):
 
         def success(results):
             if results:
@@ -80,9 +80,9 @@ class TwistedEtcdStore:
 
         def failure(reason):
             if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
-                log.info('list-cancelled')
+                log.debug('list-cancelled')
             else:
-                log.info('list-failure', error=reason)
+                log.info('list-failure', error=reason, key=key)
             return reason
 
         deferred = threads.deferToThread(self._etcd.get_prefix, self.make_path(key), keys_only=keys_only)
@@ -97,9 +97,9 @@ class TwistedEtcdStore:
 
         def failure(reason):
             if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
-                log.info('watch-cancelled')
+                log.debug('watch-cancelled')
             else:
-                log.info('watch-failure', error=reason)
+                log.info('watch-failure', error=reason, key=key)
             return reason
 
         deferred = threads.deferToThread(self._etcd.add_watch_callback, self.make_path(key), callback)
@@ -108,22 +108,22 @@ class TwistedEtcdStore:
         return deferred
 
     def delete(self, key):
-        log.info('entry', key=key)
+        log.debug('entry', key=key)
 
         if key is None or len(key) == 0:
             raise ValueError("key-not-provided: '{}'".format(key))
 
         def success(results, k):
-            log.info('delete-success', results=results, key=k)
+            log.debug('delete-success', results=results, key=k)
             if results:
                 return results
             return False
 
         def failure(reason):
             if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
-                log.info('delete-cancelled')
+                log.debug('delete-cancelled')
             else:
-                log.info('delete-failure', error=reason)
+                log.info('delete-failure', error=reason, key=key)
             return reason
 
         deferred = threads.deferToThread(self._etcd.delete, self.make_path(key))
@@ -132,19 +132,19 @@ class TwistedEtcdStore:
         return deferred
 
     def delete_prefix(self, prefix):
-        log.info('entry', prefix=prefix)
+        log.debug('entry', prefix=prefix)
 
         def success(results, k):
-            log.info('delete-prefix-success', results=results, prefix=k)
+            log.debug('delete-prefix-success', results=results, prefix=k)
             if results:
                 return results
             return False
 
         def failure(reason):
             if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
-                log.info('delete-prefix-cancelled')
+                log.debug('delete-prefix-cancelled')
             else:
-                log.info('delete-prefix-failure', error=reason)
+                log.info('delete-prefix-failure', error=reason, prefix=prefix)
             return reason
 
         if prefix is not None and len(prefix) > 0:
