@@ -52,12 +52,17 @@ Installation instruction
 
 Release Notes
 -------------
+v2.4.0 (2020-11-29)
+^^^^^^^^^^^^^^^^^^^
+
+ - Initial v2.4 release
+
+
 v2.0.9 (2020-10-28)
 ^^^^^^^^^^^^^^^^^^^
 
 - Lowered log message level for twisted-etcd-store success calls.
 
--------------
 v2.0.8 (2020-10-22)
 ^^^^^^^^^^^^^^^^^^^
 
