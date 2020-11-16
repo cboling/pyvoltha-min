@@ -14,6 +14,8 @@
 #
 import structlog
 import etcd3
+import etcd3.utils as utils
+
 from twisted.internet import threads
 from twisted.internet.defer import CancelledError
 from twisted.python.failure import Failure
@@ -28,6 +30,11 @@ class TwistedEtcdStore:
         self.host = host
         self.port = port
         self._path_prefix = path_prefix
+
+    def close(self):
+        client, self._etcd = self._etcd, None
+        if client is not None:
+            threads.deferToThread(client.close)
 
     def make_path(self, key):
         if key is None:
@@ -90,7 +97,7 @@ class TwistedEtcdStore:
         deferred.addErrback(failure)
         return deferred
 
-    def watch(self, key, callback):
+    def watch(self, key, callback, watch_prefix=False):
 
         def success(results):
             return results
@@ -102,7 +109,13 @@ class TwistedEtcdStore:
                 log.info('watch-failure', error=reason, key=key)
             return reason
 
-        deferred = threads.deferToThread(self._etcd.add_watch_callback, self.make_path(key), callback)
+        path = self.make_path(key)
+        if watch_prefix:
+            kwargs = dict(range_end=utils.increment_last_byte(utils.to_bytes(path)))
+            deferred = threads.deferToThread(self._etcd.add_watch_callback, path, callback, **kwargs)
+        else:
+            deferred = threads.deferToThread(self._etcd.add_watch_callback, path, callback)
+
         deferred.addCallback(success)
         deferred.addErrback(failure)
         return deferred

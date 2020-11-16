@@ -52,11 +52,17 @@ Installation instruction
 
 Release Notes
 -------------
-v2.4.0 (2020-11-29)
+v2.4.1 (2020-11-xx)
+^^^^^^^^^^^^^^^^^^^
+
+ - Updated requirements (most notably txaioetcd and confluent-kafka) to latest versions
+ - Provide optional etcd change watch callback to be specified by external user
+ - Allow watch callback to work for a prefix (more efficient with logger callbacks)
+
+v2.4.0 (2020-10-29)
 ^^^^^^^^^^^^^^^^^^^
 
  - Initial v2.4 release
-
 
 v2.0.9 (2020-10-28)
 ^^^^^^^^^^^^^^^^^^^
