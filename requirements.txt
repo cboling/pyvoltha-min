@@ -4,9 +4,9 @@
 PyYAML          == 5.3.1
 Twisted         == 20.3.0
 argparse        == 1.4.0
-arrow           == 0.16.0
+arrow           == 0.17.0
 bitstring       == 3.1.7
-confluent-kafka == 0.11.5       # 1.5.0
+confluent-kafka == 0.11.5       # 1.5.0   # Was 0.11.5
 docker-py       == 1.10.6
 etcd3           == 0.12.0
 jsonpatch       == 1.26
@@ -16,6 +16,6 @@ netifaces       == 0.10.9
 protobuf        == 3.13.0
 simplejson      == 3.17.2
 structlog       == 20.1.0
-txaioetcd       == 0.3.0        # 18.10.2
+txaioetcd       == 18.10.2      # Was 0.3.0
 voltha-protos   == 3.4.5        # 3.4.5 is check-in with deprecated alarm protos removed
                                 #       and before the addition of the 'force delete' option

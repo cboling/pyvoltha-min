@@ -52,7 +52,7 @@ Installation instruction
 
 Release Notes
 -------------
-v2.4.1 (2020-11-xx)
+v2.4.1 (2020-11-16)
 ^^^^^^^^^^^^^^^^^^^
 
  - Updated requirements (most notably txaioetcd and confluent-kafka) to latest versions

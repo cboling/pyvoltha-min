@@ -49,7 +49,7 @@ setup(
     url='https://github.com/cboling/pyvoltha-min',
 
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'Topic :: Software Development :: Libraries',
         'License :: OSI Approved :: Apache Software License',

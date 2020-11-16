@@ -143,14 +143,13 @@ class LogController:
         if self._component_name is None:
             raise Exception("Invalid pod component name")
 
-        _results = yield self.set_default_loglevel(self.global_config_path,
-                                                   self.component_config_path,
-                                                   initial_default_loglevel.upper())
-        # Initial seed
-        _results = yield self.process_log_config_change('startup')
         _results = yield self.etcd_client.watch(self.global_config_path, self.watch_callback)
         _results = yield self.etcd_client.watch(self.component_config_path, self.watch_callback,
                                                 watch_prefix=True)
+
+        _results = yield self.set_default_loglevel(self.global_config_path,
+                                                   self.component_config_path,
+                                                   initial_default_loglevel.upper())
 
     def watch_callback(self, event):
         reactor.callFromThread(self.process_log_config_change, event)
