@@ -52,10 +52,18 @@ Installation instruction
 
 Release Notes
 -------------
+v2.4.2 (2020-11-18)
+^^^^^^^^^^^^^^^^^^^
+
+ - Updated requirements (most notably confluent-kafka) to latest versions
+ - Kafka requests now run in their own tasks
+ - Support alarm (ONU Signal Fail) if deregistation due to degraded signal occurs
+
+-------------
 v2.4.1 (2020-11-16)
 ^^^^^^^^^^^^^^^^^^^
 
- - Updated requirements (most notably txaioetcd and confluent-kafka) to latest versions
+ - Updated requirements (most notably txaioetcd) to latest versions
  - Provide optional etcd change watch callback to be specified by external user
  - Allow watch callback to work for a prefix (more efficient with logger callbacks)
 
