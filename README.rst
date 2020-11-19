@@ -52,6 +52,13 @@ Installation instruction
 
 Release Notes
 -------------
+v2.4.3 (2020-11-19)
+^^^^^^^^^^^^^^^^^^^
+
+ - Added some reasonable max/min values on the PM Config frequency & skew
+ - ONU and GEM Port stats are optional and not configured by default to match what
+   the OpenOLT currently supports
+
 v2.4.2 (2020-11-18)
 ^^^^^^^^^^^^^^^^^^^
 
@@ -59,7 +66,6 @@ v2.4.2 (2020-11-18)
  - Kafka requests now run in their own tasks
  - Support alarm (ONU Signal Fail) if deregistation due to degraded signal occurs
 
--------------
 v2.4.1 (2020-11-16)
 ^^^^^^^^^^^^^^^^^^^
 
