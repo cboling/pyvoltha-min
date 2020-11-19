@@ -18,6 +18,10 @@ from voltha_protos.device_pb2 import PmConfig, PmConfigs, PmGroupConfig
 
 from pyvoltha_min.adapters.extensions.events.kpi.adapter_pm_metrics import AdapterPmMetrics
 
+MIN_PM_FREQUENCY = 50       # Five Seconds
+MIN_PM_SKEW = 0             # 0%
+MAX_PM_SKEW = 50            # 50%
+
 
 class OltPmMetrics(AdapterPmMetrics):
     """
@@ -29,7 +33,8 @@ class OltPmMetrics(AdapterPmMetrics):
     """
     # pylint: disable=too-many-arguments
     def __init__(self, event_mgr, core_proxy, device_id, logical_device_id, serial_number,
-                 grouped=False, freq_override=False, **kwargs):
+                 grouped=False, freq_override=False, support_onu_statistics=False,
+                 support_gem_port_statistic=False, **kwargs):
         """
         Initializer for shared ONU Device Adapter PM metrics
 
@@ -49,6 +54,9 @@ class OltPmMetrics(AdapterPmMetrics):
         super().__init__(event_mgr, core_proxy, device_id, logical_device_id, serial_number,
                          grouped=grouped, freq_override=freq_override,
                          **kwargs)
+
+        self.support_onu_stats = support_onu_statistics
+        self.support_gem_stats = support_onu_statistics and support_gem_port_statistic
 
         # PM Config Types are COUNTER, GAUGE, and STATE
         self.nni_pm_names = {
@@ -116,25 +124,48 @@ class OltPmMetrics(AdapterPmMetrics):
                                    for (m, t) in self.nni_pm_names}
         self.pon_metrics_config = {m: PmConfig(name=m, type=t, enabled=True)
                                    for (m, t) in self.pon_pm_names}
-        self.onu_metrics_config = {m: PmConfig(name=m, type=t, enabled=True)
-                                   for (m, t) in self.onu_pm_names}
-        self.gem_metrics_config = {m: PmConfig(name=m, type=t, enabled=True)
-                                   for (m, t) in self.gem_pm_names}
+        if self.support_onu_stats:
+            self.onu_metrics_config = {m: PmConfig(name=m, type=t, enabled=True)
+                                       for (m, t) in self.onu_pm_names}
+        else:
+            self.onu_metrics_config = dict()
+
+        if self.support_gem_stats:
+            self.gem_metrics_config = {m: PmConfig(name=m, type=t, enabled=True)
+                                       for (m, t) in self.gem_pm_names}
+        else:
+            self.gem_metrics_config = dict()
 
         self._nni_ports = kwargs.pop('nni-ports', None)
         self._pon_ports = kwargs.pop('pon-ports', None)
 
-    def update(self, pm_config):
+    def update(self, pm_config):    # pylint: disable=too-many-branches
+        self.log.debug('update-config', pm_config=pm_config)
         try:
             # TODO: Test frequency override capability for a particular group
             if self.default_freq != pm_config.default_freq:
-                # Update the callback to the new frequency.
-                self.default_freq = pm_config.default_freq
-                self.lp_callback.stop()
-                self.lp_callback.start(interval=self.default_freq / 10)
+                if pm_config.default_freq < MIN_PM_FREQUENCY and pm_config.default_freq != 0:
+                    self.log.warn('invalid-pm-frequency', value=pm_config.default_freq,
+                                  minimum=MIN_PM_FREQUENCY)
+
+                else:
+                    # Update the callback to the new frequency.
+                    self.default_freq = pm_config.default_freq
+
+                    if self.lp_callback is not None:
+                        if self.lp_callback.running:
+                            self.lp_callback.stop()
+
+                        if self.default_freq > 0:
+                            self.lp_callback.start(interval=self.default_freq / 10)
 
             if self.max_skew != pm_config.max_skew:
-                self.max_skew = pm_config.max_skew
+                if MIN_PM_SKEW <= pm_config.max_skew <= MAX_PM_SKEW:
+                    self.max_skew = pm_config.max_skew
+
+                else:
+                    self.log.warn('invalid-pm-skew', value=pm_config.max_skew,
+                                  minimum=MIN_PM_SKEW, maximum=MAX_PM_SKEW)
 
             if pm_config.grouped:
                 for group in pm_config.groups:
@@ -174,20 +205,27 @@ class OltPmMetrics(AdapterPmMetrics):
                                              group_freq=self.default_freq,
                                              enabled=True)
 
-                pm_onu_stats = PmGroupConfig(group_name='ONU',
-                                             group_freq=self.default_freq,
-                                             enabled=True)
-
-                # pm_gem_stats = PmGroupConfig(group_name='GEM',
-                #                              group_freq=self.default_freq,
-                #                              enabled=True)
-                pm_gem_stats = PmGroupConfig(group_name='GEM',
-                                             group_freq=self.default_freq,
-                                             enabled=False)
-
                 self.pm_group_metrics[pm_pon_stats.group_name] = pm_pon_stats
-                self.pm_group_metrics[pm_onu_stats.group_name] = pm_onu_stats
-                self.pm_group_metrics[pm_gem_stats.group_name] = pm_gem_stats
+
+                if self.support_onu_stats:
+                    pm_onu_stats = PmGroupConfig(group_name='ONU',
+                                                 group_freq=self.default_freq,
+                                                 enabled=True)
+                    self.pm_group_metrics[pm_onu_stats.group_name] = pm_onu_stats
+                else:
+                    pm_onu_stats = None
+
+                if self.support_gem_stats:
+                    # pm_gem_stats = PmGroupConfig(group_name='GEM',
+                    #                              group_freq=self.default_freq,
+                    #                              enabled=True)
+                    pm_gem_stats = PmGroupConfig(group_name='GEM',
+                                                 group_freq=self.default_freq,
+                                                 enabled=False)
+
+                    self.pm_group_metrics[pm_gem_stats.group_name] = pm_gem_stats
+                else:
+                    pm_gem_stats = None
             else:
                 pm_pon_stats = None
                 pm_onu_stats = None
@@ -196,8 +234,8 @@ class OltPmMetrics(AdapterPmMetrics):
         else:
             pm_ether_stats = pm_config if have_nni else None
             pm_pon_stats = pm_config if have_pon else None
-            pm_onu_stats = pm_config if have_pon else None
-            pm_gem_stats = pm_config if have_pon else None
+            pm_onu_stats = pm_config if have_pon and self.support_onu_stats else None
+            pm_gem_stats = pm_config if have_pon and self.support_gem_stats else None
 
         if have_nni:
             for metric in sorted(self.nni_metrics_config):
@@ -220,25 +258,27 @@ class OltPmMetrics(AdapterPmMetrics):
                                                       type=pmetric.type,
                                                       enabled=pmetric.enabled)])
 
-            for metric in sorted(self.onu_metrics_config):
-                pmetric = self.onu_metrics_config[metric]
-                if not self.grouped:
-                    if pmetric.name in metrics:
-                        continue
-                    metrics.add(pmetric.name)
-                pm_onu_stats.metrics.extend([PmConfig(name=pmetric.name,
-                                                      type=pmetric.type,
-                                                      enabled=pmetric.enabled)])
+            if self.support_onu_stats:
+                for metric in sorted(self.onu_metrics_config):
+                    pmetric = self.onu_metrics_config[metric]
+                    if not self.grouped:
+                        if pmetric.name in metrics:
+                            continue
+                        metrics.add(pmetric.name)
+                    pm_onu_stats.metrics.extend([PmConfig(name=pmetric.name,
+                                                          type=pmetric.type,
+                                                          enabled=pmetric.enabled)])
 
-            for metric in sorted(self.gem_metrics_config):
-                pmetric = self.gem_metrics_config[metric]
-                if not self.grouped:
-                    if pmetric.name in metrics:
-                        continue
-                    metrics.add(pmetric.name)
-                pm_gem_stats.metrics.extend([PmConfig(name=pmetric.name,
-                                                      type=pmetric.type,
-                                                      enabled=pmetric.enabled)])
+            if self.support_gem_stats:
+                for metric in sorted(self.gem_metrics_config):
+                    pmetric = self.gem_metrics_config[metric]
+                    if not self.grouped:
+                        if pmetric.name in metrics:
+                            continue
+                        metrics.add(pmetric.name)
+                    pm_gem_stats.metrics.extend([PmConfig(name=pmetric.name,
+                                                          type=pmetric.type,
+                                                          enabled=pmetric.enabled)])
         if self.grouped:
             pm_config.groups.extend(self.pm_group_metrics.values())
 
@@ -277,7 +317,7 @@ class OltPmMetrics(AdapterPmMetrics):
                 if group_data is not None:
                     data.append(group_data)
 
-        for port in self._pon_ports:
+        for port in self._pon_ports:      # pylint: disable=too-many-nested-blocks
             group_name = 'PON'
             if self.pm_group_metrics[group_name].enabled:
                 group_data = self.collect_group_metrics(group_name,
@@ -287,28 +327,30 @@ class OltPmMetrics(AdapterPmMetrics):
                 if group_data is not None:
                     data.append(group_data)
 
-            for onu_id in port.onu_ids:
-                onu = port.onu(onu_id)
-                if onu is not None:
-                    group_name = 'ONU'
-                    if self.pm_group_metrics[group_name].enabled:
-                        group_data = self.collect_group_metrics(group_name,
-                                                                onu,
-                                                                self.onu_pm_names,
-                                                                self.onu_metrics_config)
-                        if group_data is not None:
-                            data.append(group_data)
+            if self.support_onu_stats:
+                for onu_id in port.onu_ids:
+                    onu = port.onu(onu_id)
+                    if onu is not None:
+                        group_name = 'ONU'
+                        if self.pm_group_metrics[group_name].enabled:
+                            group_data = self.collect_group_metrics(group_name,
+                                                                    onu,
+                                                                    self.onu_pm_names,
+                                                                    self.onu_metrics_config)
+                            if group_data is not None:
+                                data.append(group_data)
 
-                    group_name = 'GEM'
-                    if self.pm_group_metrics[group_name].enabled:
-                        for gem in onu.gem_ports:
-                            if not gem.multicast:
-                                group_data = self.collect_group_metrics(group_name,
-                                                                        onu,
-                                                                        self.gem_pm_names,
-                                                                        self.gem_metrics_config)
-                                if group_data is not None:
-                                    data.append(group_data)
+                    if self.support_gem_stats:
+                        group_name = 'GEM'
+                        if self.pm_group_metrics[group_name].enabled:
+                            for gem in onu.gem_ports:
+                                if not gem.multicast:
+                                    group_data = self.collect_group_metrics(group_name,
+                                                                            onu,
+                                                                            self.gem_pm_names,
+                                                                            self.gem_metrics_config)
+                                    if group_data is not None:
+                                        data.append(group_data)
 
                             # TODO: Do any multicast GEM PORT metrics here...
         return data

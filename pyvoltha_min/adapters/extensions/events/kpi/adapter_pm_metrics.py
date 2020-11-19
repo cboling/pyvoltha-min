@@ -14,6 +14,7 @@
 
 from __future__ import division
 
+import random
 import arrow
 import structlog
 from twisted.internet.task import LoopingCall
@@ -22,7 +23,7 @@ from voltha_protos.events_pb2 import EventType, EventCategory, EventSubCategory
 from voltha_protos.events_pb2 import KpiEvent2, KpiEventType, MetricInformation, MetricMetaData
 
 
-class AdapterPmMetrics:     # pylint: disable=too-many-arguments, invalid-name
+class AdapterPmMetrics:
     """
     Base class for Device Adapter PM Metrics Manager
 
@@ -40,6 +41,7 @@ class AdapterPmMetrics:     # pylint: disable=too-many-arguments, invalid-name
     # for collection.
     TIMESTAMP_ATTRIBUTE = 'timestamp'
 
+    # pylint: disable=too-many-arguments
     def __init__(self, event_mgr, core_proxy, device_id, logical_device_id, serial_number,
                  grouped=False, freq_override=False, max_skew=5, **kwargs):
         """
@@ -183,6 +185,15 @@ class AdapterPmMetrics:     # pylint: disable=too-many-arguments, invalid-name
     def collect_and_publish_metrics(self):
         """ Request collection of all enabled metrics and publish them """
         try:
+            # Adjust next time if there is a skew
+            interval = self.default_freq / 10
+            if self.max_skew != 0:
+                skew = random.uniform(-interval * (self.max_skew / 100), interval * (self.max_skew / 100))
+                interval += skew
+
+            self.lp_callback.interval = interval
+
+            # Collect the data
             data = self.collect_metrics()
             raised_ts = arrow.utcnow().timestamp
             self.publish_metrics(data, raised_ts)
