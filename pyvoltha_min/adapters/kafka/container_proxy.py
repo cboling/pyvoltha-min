@@ -20,11 +20,11 @@ The superclass for all kafka proxy subclasses.
 
 import structlog
 from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.internet.defer import TimeoutError as TwistedTimeoutError
 from twisted.python import failure
 from zope.interface import implementer
 
-from pyvoltha_min.common.utils.deferred_utils import DeferredWithTimeout, \
-    TimeOutError
+from pyvoltha_min.common.utils.deferred_utils import DeferredWithTimeout
 from pyvoltha_min.common.utils.registry import IComponent
 
 log = structlog.get_logger()
@@ -32,6 +32,7 @@ log = structlog.get_logger()
 
 class KafkaMessagingError(BaseException):
     def __init__(self, error):
+        super().__init__()
         self.error = error
 
 
@@ -46,10 +47,10 @@ class ContainerProxy:
 
     def start(self):
         log.info('started')
-
         return self
 
-    def stop(self):
+    @staticmethod
+    def stop():
         log.info('stopped')
 
     @classmethod
@@ -58,21 +59,28 @@ class ContainerProxy:
             @inlineCallbacks
             def wrapper(*args, **kw):
                 try:
-                    (success, d) = yield func(*args, **kw)
+                    results = yield func(*args, **kw)
+                    if isinstance(results, tuple):
+                        success = results[0]
+                        d = results[1]
+                    else:
+                        success = False
+                        d = None
+
                     if success:
                         log.debug("successful-response", func=func)
                         if return_cls is not None:
-                            rc = return_cls()
+                            rclass = return_cls()
                             if d is not None:
-                                d.Unpack(rc)
-                            returnValue(rc)
+                                d.Unpack(rclass)
+                            returnValue(rclass)
                         else:
                             log.debug("successful-response-none", func=func)
                             returnValue(None)
                     else:
-                        log.info("unsuccessful-request", func=func, args=args,
-                                 kw=kw)
+                        log.info("unsuccessful-request", func=func, args=args, kw=kw)
                         returnValue(d)
+
                 except Exception as e:
                     log.exception("request-wrapper-exception", func=func, e=e)
                     raise
@@ -103,8 +111,9 @@ class ContainerProxy:
                     m_callback.callback(result)
                 else:
                     log.debug('timeout-already-occurred', rpc=rpc)
-            except Exception as e:
-                log.exception("Failure-sending-request", rpc=rpc, kw=kwargs)
+
+            except Exception as _e:
+                log.exception("failure-sending-request", rpc=rpc, kw=kwargs)
                 if not m_callback.called:
                     m_callback.errback(failure.Failure())
 
@@ -118,16 +127,18 @@ class ContainerProxy:
         retry = 0
         max_retry = 2
         for timeout in timeouts:
-            cb = DeferredWithTimeout(timeout=timeout)
-            _send_request(rpc, cb, to_topic, reply_topic, **kwargs)
+            d = DeferredWithTimeout(timeout=timeout)
+            _send_request(rpc, d, to_topic, reply_topic, **kwargs)
             try:
-                res = yield cb
+                res = yield d
                 returnValue(res)
 
-            except TimeOutError as e:
-                log.warn('invoke-timeout', e=e)
+            except TwistedTimeoutError as e:
                 if retry == max_retry:
+                    log.warn('invoke-timeout', e=e, retry=retry, max_retry=max_retry)
                     raise e
+
+                log.info('invoke-timeout', e=e, retry=retry, max_retry=max_retry)
                 retry += 1
                 if retry == max_retry:
                     to_topic = self.remote_topic

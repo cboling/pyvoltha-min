@@ -14,16 +14,14 @@
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred
 from twisted.internet.error import AlreadyCalled
-
-
-class TimeOutError(Exception): pass
+from twisted.internet.error import TimeoutError as TwistedTimeoutError
 
 
 class DeferredWithTimeout(Deferred):
     """
     Deferred with a timeout. If neither the callback nor the errback method
     is not called within the given time, the deferred's errback will be called
-    with a TimeOutError() exception.
+    with a Twisted TimeOutError() exception.
 
     All other uses are the same as of Deferred().
     """
@@ -34,13 +32,13 @@ class DeferredWithTimeout(Deferred):
 
     def timed_out(self):
         self.errback(
-            TimeOutError('timed out after {} seconds'.format(self._timeout)))
+            TwistedTimeoutError('timed out after {} seconds'.format(self._timeout)))
 
     def callback(self, result):
         self._cancel_timer()
         return Deferred.callback(self, result)
 
-    def errback(self, fail):
+    def errback(self, fail=None):
         self._cancel_timer()
         return Deferred.errback(self, fail)
 
@@ -53,4 +51,3 @@ class DeferredWithTimeout(Deferred):
             self.timer.cancel()
         except AlreadyCalled:
             pass
-

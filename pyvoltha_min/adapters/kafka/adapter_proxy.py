@@ -36,9 +36,7 @@ KV_STORE_DATA_PATH_PREFIX = "service/voltha"
 
 class AdapterProxy(ContainerProxy):     # pylint: disable=too-few-public-methods
     def __init__(self, kafka_proxy, adapter_topic, my_listening_topic, kv_store_address):
-        super(AdapterProxy, self).__init__(kafka_proxy,
-                                           adapter_topic,
-                                           my_listening_topic)
+        super().__init__(kafka_proxy, adapter_topic, my_listening_topic)
         # KV store's IP Address and PORT
         host, port = kv_store_address.split(':', 1)
         etcd = TwistedEtcdStore(host, port, KV_STORE_DATA_PATH_PREFIX)
@@ -113,7 +111,7 @@ class AdapterProxy(ContainerProxy):     # pylint: disable=too-few-public-methods
             returnValue(res)
 
         except Exception as e:
-            log.exception("error-sending-request", e=e)
+            log.warn("error-sending-request", e=e)
 
     @property
     def endpoint_manager(self):
