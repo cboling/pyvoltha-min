@@ -24,7 +24,7 @@ from os import path
 
 from setuptools import setup, find_packages
 
-package = 'pyvoltha-min'
+package = 'pyvoltha-min'                            # pylint: disable=invalid-name
 setup_dir = path.dirname(path.abspath(__file__))
 version_file = path.join(setup_dir, "VERSION")
 
@@ -49,7 +49,7 @@ setup(
     url='https://github.com/cboling/pyvoltha-min',
 
     classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'Topic :: Software Development :: Libraries',
         'License :: OSI Approved :: Apache Software License',
