@@ -17,13 +17,14 @@ from uuid import uuid4
 
 import structlog
 from simplejson import dumps, loads
-from voltha.core.config.config_node import ConfigNode
-from voltha.core.config.config_rev import ConfigRevision
-from voltha.core.config.config_rev_persisted import PersistedConfigRevision
-from voltha.core.config.merge_3way import MergeConflictException
+from .config_node import ConfigNode
+from .config_rev import ConfigRevision
+from .config_rev_persisted import PersistedConfigRevision
+from .merge_3way import MergeConflictException
 
 log = structlog.get_logger()
 
+# TODO: Search for usage of any/all the modules in this package.  They may not be used anymore
 
 class ConfigRoot(ConfigNode):
 
@@ -55,8 +56,8 @@ class ConfigRoot(ConfigNode):
             # TODO this shall be a fake_dict providing noop for all relevant
             # operations
             return dict()
-        else:
-            return self._kv_store
+
+        return self._kv_store
 
     def mkrev(self, *args, **kw):
         return self._rev_cls(*args, **kw)
@@ -87,7 +88,9 @@ class ConfigRoot(ConfigNode):
     # ~~~~~~ Overridden, root-level CRUD methods to handle transactions ~~~~~~~
 
     def update(self, path, data, strict=None, txid=None, mk_branch=None):
-        assert mk_branch is None
+        if mk_branch is not None:
+            raise ValueError('mk_branch parameter is not None')
+
         self.check_callback_queue()
         try:
             if txid is not None:
@@ -97,16 +100,17 @@ class ConfigRoot(ConfigNode):
                     dirtied.add(node)
                     return node._mk_txbranch(txid)
 
-                res = super(ConfigRoot, self).update(path, data, strict,
-                                                          txid, track_dirty)
+                res = super().update(path, data, strict, txid, track_dirty)
             else:
-                res = super(ConfigRoot, self).update(path, data, strict)
+                res = super().update(path, data, strict)
         finally:
             self.execute_deferred_callbacks()
         return res
 
     def add(self, path, data, txid=None, mk_branch=None):
-        assert mk_branch is None
+        if mk_branch is not None:
+            raise ValueError('mk_branch parameter is not None')
+
         self.check_callback_queue()
         try:
             if txid is not None:
@@ -124,7 +128,9 @@ class ConfigRoot(ConfigNode):
         return res
 
     def remove(self, path, txid=None, mk_branch=None):
-        assert mk_branch is None
+        if mk_branch is not None:
+            raise ValueError('mk_branch parameter is not None')
+
         self.check_callback_queue()
         try:
             if txid is not None:
@@ -142,7 +148,8 @@ class ConfigRoot(ConfigNode):
         return res
 
     def check_callback_queue(self):
-        assert len(self._deferred_callback_queue) == 0
+        if len(self._deferred_callback_queue) != 0:
+            raise Exception('Callback queue is not empty')
 
     def enqueue_callback(self, func, *args, **kw):
         self._deferred_callback_queue.append((func, args, kw))
@@ -225,4 +232,3 @@ class ConfigRoot(ConfigNode):
         self.load_latest(root_data['latest'])
 
         self._loading = False
-

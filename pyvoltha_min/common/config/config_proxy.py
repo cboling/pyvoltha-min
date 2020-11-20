@@ -22,7 +22,7 @@ from pyvoltha_min.common.config.config_txn import ConfigTransaction
 log = structlog.get_logger()
 
 
-class OperationContext(object):
+class OperationContext:
     def __init__(self, path=None, data=None, field_name=None, child_key=None):
         self.path = path
         self._data = data
@@ -65,7 +65,7 @@ class CallbackType(Enum):
     POST_LISTCHANGE = 8
 
 
-class ConfigProxy(object):
+class ConfigProxy:
     """
     Allows an entity to look at a sub-tree and see it as it was the whole tree
     """
@@ -94,17 +94,23 @@ class ConfigProxy(object):
         return self._node.get(path, depth=depth, deep=deep, txid=txid)
 
     def update(self, path, data, strict=False, txid=None):
-        assert path.startswith('/')
+        if not path.startswith('/'):
+            raise ValueError('path does not start with a slash /')
+
         full_path = self._path if path == '/' else self._path + path
         return self._root.update(full_path, data, strict, txid=txid)
 
     def add(self, path, data, txid=None):
-        assert path.startswith('/')
+        if not path.startswith('/'):
+            raise ValueError('path does not start with a slash /')
+
         full_path = self._path if path == '/' else self._path + path
         return self._root.add(full_path, data, txid=txid)
 
     def remove(self, path, txid=None):
-        assert path.startswith('/')
+        if not path.startswith('/'):
+            raise ValueError('path does not start with a slash /')
+
         full_path = self._path if path == '/' else self._path + path
         return self._root.remove(full_path, txid=txid)
 

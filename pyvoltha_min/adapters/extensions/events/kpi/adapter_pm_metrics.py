@@ -188,7 +188,7 @@ class AdapterPmMetrics:
             # Adjust next time if there is a skew
             interval = self.default_freq / 10
             if self.max_skew != 0:
-                skew = random.uniform(-interval * (self.max_skew / 100), interval * (self.max_skew / 100))
+                skew = random.uniform(-interval * (self.max_skew / 100), interval * (self.max_skew / 100))   # nosec
                 interval += skew
 
             self.lp_callback.interval = interval

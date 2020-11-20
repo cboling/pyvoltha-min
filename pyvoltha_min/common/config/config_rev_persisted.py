@@ -25,6 +25,7 @@ from simplejson import dumps, loads
 from pyvoltha_min.common.config.config_rev import ConfigRevision, children_fields
 
 log = structlog.get_logger()
+# TODO: Search for usage of any/all the modules in this package.  They may not be used anymore
 
 
 class PersistedConfigRevision(ConfigRevision):
@@ -35,10 +36,10 @@ class PersistedConfigRevision(ConfigRevision):
 
     def __init__(self, branch, data, children=None):
         self._kv_store = branch._node._root._kv_store
-        super(PersistedConfigRevision, self).__init__(branch, data, children)
+        super().__init__(branch, data, children)
 
     def _finalize(self):
-        super(PersistedConfigRevision, self)._finalize()
+        super()._finalize()
         self.store()
 
     def __del__(self):
@@ -47,7 +48,7 @@ class PersistedConfigRevision(ConfigRevision):
                 if self._config.__weakref__ is None:
                     if self._config._hash in self._kv_store:
                         del self._kv_store[self._config._hash]
-                assert self.__weakref__ is None
+                # assert self.__weakref__ is None
                 if self._hash in self._kv_store:
                     del self._kv_store[self._hash]
         except Exception as e:

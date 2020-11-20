@@ -140,7 +140,7 @@ class IKafkaMessagingProxy:
                 if queue is not None:
                     try:
                         queue.put("bye-bye")
-                    except Exception:
+                    except Exception:            # nosec
                         pass
 
                 if proxy is not None:
