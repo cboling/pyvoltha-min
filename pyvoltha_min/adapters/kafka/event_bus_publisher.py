@@ -23,7 +23,7 @@ bus toward the external world.
 import structlog
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.message import Message
-from simplejson import dumps
+from json import dumps
 
 from pyvoltha_min.common.event_bus import EventBusClient
 

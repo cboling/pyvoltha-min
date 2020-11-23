@@ -26,7 +26,7 @@ from hashlib import md5
 
 import structlog
 from google.protobuf.descriptor import Descriptor
-from simplejson import dumps
+from json import dumps
 from voltha_protos import meta_pb2
 
 from pyvoltha_min.common.utils.json_format import MessageToJson

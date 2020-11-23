@@ -14,7 +14,7 @@
 import structlog
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.message import Message
-from simplejson import dumps
+from json import dumps
 from voltha_protos.events_pb2 import ConfigEvent, ConfigEventType
 
 from pyvoltha_min.common.config.config_proxy import CallbackType
@@ -61,4 +61,3 @@ class ConfigEventBus(object):
         )
 
         self._event_bus_client.publish(self._topic, event)
-

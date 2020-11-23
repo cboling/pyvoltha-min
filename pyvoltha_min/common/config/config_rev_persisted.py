@@ -20,7 +20,7 @@ A config rev object that persists itself
 from bz2 import compress, decompress
 
 import structlog
-from simplejson import dumps, loads
+from json import dumps, loads
 
 from pyvoltha_min.common.config.config_rev import ConfigRevision, children_fields
 

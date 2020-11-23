@@ -16,7 +16,7 @@
 from uuid import uuid4
 
 import structlog
-from simplejson import dumps, loads
+from json import dumps, loads
 from .config_node import ConfigNode
 from .config_rev import ConfigRevision
 from .config_rev_persisted import PersistedConfigRevision

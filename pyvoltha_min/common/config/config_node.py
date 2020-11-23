@@ -17,8 +17,8 @@ from copy import copy
 
 import six
 import structlog
-from jsonpatch import JsonPatch
-from jsonpatch import make_patch
+# from jsonpatch import JsonPatch
+# from jsonpatch import make_patch
 from voltha_protos import meta_pb2
 
 from .config_branch import ConfigBranch
@@ -484,16 +484,16 @@ class ConfigNode:
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Diff utility ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def diff(self, hash1, hash2=None, txid=None):
-        branch = self._branches[txid]
-        rev1 = branch[hash1]
-        rev2 = branch[hash2] if hash2 else branch._latest
-        if rev1.hash == rev2.hash:
-            return JsonPatch([])
-
-        dict1 = message_to_dict(rev1.data)
-        dict2 = message_to_dict(rev2.data)
-        return make_patch(dict1, dict2)
+    # def diff(self, hash1, hash2=None, txid=None):
+    #     branch = self._branches[txid]
+    #     rev1 = branch[hash1]
+    #     rev2 = branch[hash2] if hash2 else branch._latest
+    #     if rev1.hash == rev2.hash:
+    #         return JsonPatch([])
+    #
+    #     dict1 = message_to_dict(rev1.data)
+    #     dict2 = message_to_dict(rev2.data)
+    #     return make_patch(dict1, dict2)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~ Tagging utility ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -516,8 +516,8 @@ class ConfigNode:
         """
         return self._tags[tag]
 
-    def diff_by_tag(self, tag1, tag2):
-        return self.diff(self._tags[tag1].hash, self._tags[tag2].hash)
+    # def diff_by_tag(self, tag1, tag2):
+    #     return self.diff(self._tags[tag1].hash, self._tags[tag2].hash)
 
     def delete_tag(self, tag):
         del self._tags[tag]

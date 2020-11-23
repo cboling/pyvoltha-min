@@ -20,28 +20,9 @@ pyVOLTHA package.
 
 The goal for this package is to begin to deprecate and remove old
 VOLTHA 1.x features and focus on a minimal set of updated imports that can
-be supported in Python 3.6 with the hopes to transition to later versions
+be supported in Python 3.6+ with the hopes to transition to later versions
 of python. In addition, effort to remove any GPL or other restrictive
 package requirements is also highly desired.
-
-The current plan for version numbering is:
-
-+---------+------------------------------------------------------------+
-| Version | Notes                                                      |
-+=========+============================================================+
-| < 1.0.0 | Pre-release.  As version numbers increase, more imports    |
-|         |               will have been upgraded to current and       |
-|         |               unused imports/requirements removed          |
-+---------+------------------------------------------------------------+
-|   2.0.0 | Initial pre-release for VOLTHA v2.4 support several unused |
-|         | or stale libraries (consul...) will be marked as being     |
-|         | deprecated, but will remain for some backwards             |
-|         | compatibility and may be untested                          |
-+---------+------------------------------------------------------------+
-|   2.4.0 | VOLTHA v2.4 release. Deprecated classes removed so that    |
-|         | further cleanup of unused imports so that some work can be |
-|         | performed in planning for python 3.7 support               |
-+---------+------------------------------------------------------------+
 
 Installation instruction
 ------------------------
@@ -52,6 +33,18 @@ Installation instruction
 
 Release Notes
 -------------
+v2.4.4 (2020-11-23)
+^^^^^^^^^^^^^^^^^^^
+
+ - Use Twisted TimeoutError exception rather than defining own Exception class
+ - Improved timeout handling/error checking of inter-adapter exceptions to minimize
+   additional exceptions being thrown by twisted reactor while in an inlineCallback
+ - Work to support base python version of 3.8.5+.  Needs more work in pyYAML and
+   the confluent-kafka modules to support 3.8 of python
+ - Cleanup of remaining warnings (all low) identified by bandit
+ - Move Development Status classifier to level 5 - Production/Stable
+ - Dropped simplejson and docker-py packages as they are not needed
+
 v2.4.3 (2020-11-19)
 ^^^^^^^^^^^^^^^^^^^
 
