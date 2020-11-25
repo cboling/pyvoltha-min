@@ -20,7 +20,8 @@ The superclass for all kafka proxy subclasses.
 
 import structlog
 from twisted.internet.defer import inlineCallbacks, returnValue
-from twisted.internet.defer import TimeoutError as TwistedTimeoutError
+from twisted.internet.defer import TimeoutError as TwistedTimeoutErrorDefer
+from twisted.internet.error import TimeoutError as TwistedTimeoutError
 from twisted.python import failure
 from zope.interface import implementer
 
@@ -133,7 +134,7 @@ class ContainerProxy:
                 res = yield d
                 returnValue(res)
 
-            except TwistedTimeoutError as e:
+            except (TwistedTimeoutError, TwistedTimeoutErrorDefer) as e:
                 if retry == max_retry:
                     log.warn('invoke-timeout', e=e, retry=retry, max_retry=max_retry)
                     raise e

@@ -14,7 +14,7 @@
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred
 from twisted.internet.error import AlreadyCalled
-from twisted.internet.error import TimeoutError as TwistedTimeoutError
+from twisted.internet.defer import TimeoutError as TwistedTimeoutErrorDefer
 
 
 class DeferredWithTimeout(Deferred):
@@ -32,7 +32,7 @@ class DeferredWithTimeout(Deferred):
 
     def timed_out(self):
         self.errback(
-            TwistedTimeoutError('timed out after {} seconds'.format(self._timeout)))
+            TwistedTimeoutErrorDefer('timed out after {} seconds'.format(self._timeout)))
 
     def callback(self, result):
         self._cancel_timer()

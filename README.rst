@@ -33,6 +33,12 @@ Installation instruction
 
 Release Notes
 -------------
+v2.4.5 (2020-11-25)
+^^^^^^^^^^^^^^^^^^^
+
+ - More work to on twisted TimeoutError. It actually is defined as a class with the
+   same name in more than one module.
+
 v2.4.4 (2020-11-23)
 ^^^^^^^^^^^^^^^^^^^
 

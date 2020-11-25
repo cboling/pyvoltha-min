@@ -13,18 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# pylint: skip-file
 """
 Agent to play gateway between CORE and an adapter.
 """
 import structlog
 from google.protobuf.message import Message
 from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.internet.defer import TimeoutError as TwistedTimeoutErrorDefer
+from twisted.internet.error import TimeoutError as TwistedTimeoutError
 from voltha_protos.common_pb2 import ID, ConnectStatus, OperStatus
 from voltha_protos.device_pb2 import Device, Ports, Devices
-from voltha_protos.events_pb2 import Event
 from voltha_protos.inter_container_pb2 import StrType, BoolType, IntType, Packet
-from voltha_protos.voltha_pb2 import CoreInstance, EventFilterRuleKey
+from voltha_protos.voltha_pb2 import CoreInstance
 
 from .container_proxy import ContainerProxy
 
@@ -88,6 +88,11 @@ class CoreProxy(ContainerProxy):
                                     deviceTypes=deviceTypes)
             log.info("registration-returned", res=res)
             returnValue(res)
+
+        except (TwistedTimeoutError, TwistedTimeoutErrorDefer):
+            log.info('register-timeout', adapter=adapter, deviceTypes=deviceTypes)
+            raise   # Let caller get timeout so it can decide its own retransmission pattern
+
         except Exception as e:
             log.exception("registration-exception", e=e)
             raise
