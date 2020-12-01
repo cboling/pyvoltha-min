@@ -33,7 +33,7 @@ Installation instruction
 
 Release Notes
 -------------
-v2.4.5 (2020-12-xx)
+v2.4.5 (2020-12-01)
 ^^^^^^^^^^^^^^^^^^^
 
  - Require kv_store instance during instantiation of a onu single-instance tech profiler
