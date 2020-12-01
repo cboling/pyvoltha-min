@@ -69,7 +69,7 @@ class EtcdStore:
         self._kv_delete(self.make_path(key))
 
     def list(self, key):
-        self._kv_list(self.make_path(key))
+        return self._kv_list(self.make_path(key))
 
     @inlineCallbacks
     def _backoff(self, msg):

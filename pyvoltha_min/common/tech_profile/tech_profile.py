@@ -375,7 +375,7 @@ class TechProfile:
                 return json.loads(tech_profile)
 
         except KeyError as e:
-            log.info("Get-tech-profile-failed", exception=e)
+            log.info("Get-tech-profile-failed", exception=e, path=path)
             return None
 
     def _default_tech_profile(self):
@@ -399,8 +399,7 @@ class TechProfile:
             us_scheduler=Scheduler(direction=Direction.UPSTREAM.name),
             ds_scheduler=Scheduler(direction=Direction.DOWNSTREAM.name),
             upstream_gem_port_attribute_list=upstream_gem_port_attribute_list,
-            downstream_gem_port_attribute_list=
-            downstream_gem_port_attribute_list)
+            downstream_gem_port_attribute_list=downstream_gem_port_attribute_list)
 
     @staticmethod
     def _get_tech_profile(tech_profile):
@@ -603,7 +602,7 @@ class EponProfile(TechProfile):
 
 
 class TechProfileInstance:
-    def __init__(self, subscriber_identifier, tech_profile, resource_mgr, intf_id, tp_path):
+    def __init__(self, subscriber_identifier, tech_profile, resource_mgr, intf_id, tp_path, kv_store):
         if tech_profile is None:
             raise ValueError('Technology Profile not provided')
 
@@ -624,7 +623,7 @@ class TechProfileInstance:
             # All service flows referencing this TP instance will share a single TCONT. Search
             # any existing UNI ports of this ONU and see if they reference this TP-ID and have
             # already allocated a TCONT
-            existing = TechProfileInstance.get_single_instance_tp(tp_path, tech_profile.kv_store)
+            existing = TechProfileInstance.get_single_instance_tp(tp_path, kv_store)
 
             if existing is None:
                 # No, we are the first UNI on this ONU with this TPID. Get the TCONT now
@@ -702,33 +701,24 @@ class TechProfileInstance:
     @staticmethod
     def get_single_instance_tp(tp_path, kv_store):
         """ Gets another TP Instance for an ONU on a different UNI port for the same TP ID"""
-
         # For example:
         # tpPath like "service/voltha/technology_profiles/xgspon/64/pon-{0}/onu-{1}/uni-{1}"
-        # is broken into ["service/voltha/technology_profiles/xgspon/64/pon-{0}/onu-{1}" ""]
+        # is broken into ["service/voltha/technology_profiles/xgspon/64/pon-{0}/onu-{1}", ""]
         try:
-            raise NotImplemented('TODO: Not yet implemented fully')
             uni_path_slice = re.split('/uni-[0-9]+$', tp_path, maxsplit=2)
-            if uni_path_slice is not None:
+            if uni_path_slice is None:
                 return None
 
-            kv_list = kv_store.list(uni_path_slice)
-            # uniPathSlice := regexp.MustCompile(`/uni-{[0-9]+}$`).Split(tpPath, 2)
-            # kvPairs, _ := t.config.KVBackend.List(ctx, uniPathSlice[0])
-            #
-            # // Find a valid TP Instance among all the UNIs of that ONU for the given TP ID
-            # for keyPath, kvPair := range kvPairs {
-            #     if value, err := kvstore.ToByte(kvPair.Value); err == nil {
-            #         if err = json.Unmarshal(value, &tpInst); err != nil {
-            #             logger.Errorw(ctx, "error-unmarshal-kv-pair", log.Fields{"keyPath": keyPath, "value": value})
-            #             return nil, errors.New("error-unmarshal-kv-pair")
-            #         } else {
-            #             logger.Debugw(ctx, "found-valid-tp-instance-on-another-uni", log.Fields{"keyPath": keyPath})
-            #             return &tpInst, nil
-            #         }
-            #     }
-            # }
+            kv_list = kv_store.list(uni_path_slice[0])
+            for data, _metadata in kv_list:
+                try:
+                    return json.loads(data)
+
+                except Exception as e:
+                    log.warn('single-instance-json-failure', e=e, data=data, path=tp_path)
+
             return None
 
-        except Exception as _e:
+        except Exception as e:
+            log.exception('single-instance-failure', e=e)
             return None

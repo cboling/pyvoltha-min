@@ -33,6 +33,12 @@ Installation instruction
 
 Release Notes
 -------------
+v2.4.5 (2020-12-xx)
+^^^^^^^^^^^^^^^^^^^
+
+ - Require kv_store instance during instantiation of a onu single-instance tech profiler
+ - Config backend list() method should return the generator that etcd returned
+
 v2.4.5 (2020-11-25)
 ^^^^^^^^^^^^^^^^^^^
 
