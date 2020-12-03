@@ -94,7 +94,13 @@ class AdapterPmMetrics:
             self.lp_callback = LoopingCall(callback)
 
         if self.default_freq > 0 and not self.lp_callback.running:
-            self.lp_callback.start(interval=self.default_freq / 10)
+            # Adjust next time if there is a skew
+            interval = self.default_freq / 10
+            if self.max_skew != 0:
+                skew = random.uniform(-interval * (self.max_skew / 100), interval * (self.max_skew / 100))   # nosec
+                interval += skew
+
+            self.lp_callback.start(interval=interval)
 
     def stop_collector(self):
         """ Stop the collection loop"""
@@ -185,13 +191,7 @@ class AdapterPmMetrics:
     def collect_and_publish_metrics(self):
         """ Request collection of all enabled metrics and publish them """
         try:
-            # Adjust next time if there is a skew
-            interval = self.default_freq / 10
-            if self.max_skew != 0:
-                skew = random.uniform(-interval * (self.max_skew / 100), interval * (self.max_skew / 100))   # nosec
-                interval += skew
-
-            self.lp_callback.interval = interval
+            self.log.debug('entry')
 
             # Collect the data
             data = self.collect_metrics()
@@ -220,9 +220,6 @@ class AdapterPmMetrics:
                                                        raised_ts)
         if len(data) > 0:
             try:
-                # TODO: Existing adapters use the KpiEvent, if/when all existing
-                #       adapters use the shared KPI library, we may want to
-                #       deprecate the KPIEvent
                 event_body = KpiEvent2(type=KpiEventType.slice,
                                        ts=arrow.utcnow().float_timestamp,
                                        slice_data=data)
@@ -230,8 +227,3 @@ class AdapterPmMetrics:
 
             except Exception as e:
                 self.log.exception('failed-to-submit-kpis', e=e)
-
-    # TODO: Need to support on-demand counter update if provided by the PM 'group'.
-    #       Currently we expect PM data to be periodically polled by a separate
-    #       mechanism. The on-demand counter update should be optional in case the
-    #       particular device adapter group of data is polled anyway for other reasons.

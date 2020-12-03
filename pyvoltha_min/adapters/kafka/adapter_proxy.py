@@ -40,7 +40,6 @@ class AdapterProxy(ContainerProxy):     # pylint: disable=too-few-public-methods
         # KV store's IP Address and PORT
         host, port = kv_store_address.split(':', 1)
         etcd = TwistedEtcdStore(host, port, KV_STORE_DATA_PATH_PREFIX)
-        # etcd = EtcdStore(host, port, KV_STORE_DATA_PATH_PREFIX)
         self._endpoint_manager = EndpointManager(etcd)
 
     @staticmethod

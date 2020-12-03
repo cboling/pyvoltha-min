@@ -32,7 +32,6 @@ class EtcdStore:
         come in on the side and start modifying things which could be bad.
     """
 
-    CONNECT_RETRY_INTERVAL_SEC = 1
     RETRY_BACKOFF = [0.05, 0.1, 0.2, 0.5, 1, 2, 5]
 
     def __init__(self, host, port, path_prefix):
@@ -136,21 +135,3 @@ class EtcdStore:
             self._redo_etcd_connection()
 
         return result
-
-
-def load_backend(store_id, store_prefix, args):
-    """ Return the kv store backend based on the command line arguments
-    """
-
-    def load_etcd_store():
-        instance_core_store_prefix = '{}/{}'.format(store_prefix, store_id)
-
-        host, port = args.etcd.split(':', 1)
-        return EtcdStore(host, int(port), instance_core_store_prefix)
-
-    loaders = {
-        'none': lambda: None,
-        'etcd': load_etcd_store
-    }
-
-    return loaders[args.backend]()

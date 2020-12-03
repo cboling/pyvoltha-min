@@ -33,6 +33,15 @@ Installation instruction
 
 Release Notes
 -------------
+v2.4.6 (2020-12-03)
+^^^^^^^^^^^^^^^^^^^
+
+ - Added Rx/Tx frame-size (buckets) counters to NNI and PON statistics
+ - Deprecated IndexPool, IdGeneration, docker_helpers, MessageQueue, and a majority
+   of the common.config files (only EtcdStore in config_backend.py is still in use)
+   EtcdStore will be deprecated in the near future and replaced with the async version
+   (TwistedEtcdStore)
+
 v2.4.5 (2020-12-01)
 ^^^^^^^^^^^^^^^^^^^
 

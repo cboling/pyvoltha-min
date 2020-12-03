@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import division
+import random
 
 from voltha_protos.device_pb2 import PmConfig, PmConfigs, PmGroupConfig
 
@@ -79,9 +79,30 @@ class OltPmMetrics(AdapterPmMetrics):
             ('tx_ucast_packets', PmConfig.COUNTER),
             ('tx_mcast_packets', PmConfig.COUNTER),
             ('tx_bcast_packets', PmConfig.COUNTER),
-            ('tx_error_packets', PmConfig.COUNTER),
+            ('rx_runt_packets', PmConfig.COUNTER),
+            ('rx_huge_packets', PmConfig.COUNTER),
             ('rx_crc_errors', PmConfig.COUNTER),
+            ('rx_overflow_errors', PmConfig.COUNTER),
+            ('rx_linecode_errors', PmConfig.COUNTER),
+            ('tx_error_packets', PmConfig.COUNTER),
             ('bip_errors', PmConfig.COUNTER),
+
+            # Frame buckets
+            ('rx_packets_64', PmConfig.COUNTER),
+            ('rx_packets_65_127', PmConfig.COUNTER),
+            ('rx_packets_128_255', PmConfig.COUNTER),
+            ('rx_packets_256_511', PmConfig.COUNTER),
+            ('rx_packets_512_1023', PmConfig.COUNTER),
+            ('rx_packets_1024_1518', PmConfig.COUNTER),
+            ('rx_packets_1519_plus', PmConfig.COUNTER),
+
+            ('tx_packets_64', PmConfig.COUNTER),
+            ('tx_packets_65_127', PmConfig.COUNTER),
+            ('tx_packets_128_255', PmConfig.COUNTER),
+            ('tx_packets_256_511', PmConfig.COUNTER),
+            ('tx_packets_512_1023', PmConfig.COUNTER),
+            ('tx_packets_1024_1518', PmConfig.COUNTER),
+            ('tx_packets_1519_plus', PmConfig.COUNTER),
         }
         self.pon_pm_names = {
             ('oltid', PmConfig.CONTEXT),  # Physical device interface ID/Port number
@@ -93,11 +114,37 @@ class OltPmMetrics(AdapterPmMetrics):
             # ('oper_status', PmConfig.STATE),
             ('rx_packets', PmConfig.COUNTER),
             ('rx_bytes', PmConfig.COUNTER),
+            ('rx_ucast_bytes', PmConfig.COUNTER),
+            ('rx_bcast_mcast_bytes', PmConfig.COUNTER),
+            ('rx_runt_packets', PmConfig.COUNTER),
+            ('rx_huge_packets', PmConfig.COUNTER),
+            ('rx_crc_errors', PmConfig.COUNTER),
+            ('rx_overflow_errors', PmConfig.COUNTER),
+
             ('tx_packets', PmConfig.COUNTER),
             ('tx_bytes', PmConfig.COUNTER),
+            ('tx_ucast_bytes', PmConfig.COUNTER),
+            ('tx_bcast_mcast_bytes', PmConfig.COUNTER),
             ('tx_bip_errors', PmConfig.COUNTER),
             ('in_service_onus', PmConfig.GAUGE),
-            ('closest_onu_distance', PmConfig.GAUGE)
+            ('closest_onu_distance', PmConfig.GAUGE),
+
+            # Frame buckets
+            ('rx_packets_64', PmConfig.COUNTER),
+            ('rx_packets_65_127', PmConfig.COUNTER),
+            ('rx_packets_128_255', PmConfig.COUNTER),
+            ('rx_packets_256_511', PmConfig.COUNTER),
+            ('rx_packets_512_1023', PmConfig.COUNTER),
+            ('rx_packets_1024_1518', PmConfig.COUNTER),
+            ('rx_packets_1519_plus', PmConfig.COUNTER),
+
+            ('tx_packets_64', PmConfig.COUNTER),
+            ('tx_packets_65_127', PmConfig.COUNTER),
+            ('tx_packets_128_255', PmConfig.COUNTER),
+            ('tx_packets_256_511', PmConfig.COUNTER),
+            ('tx_packets_512_1023', PmConfig.COUNTER),
+            ('tx_packets_1024_1518', PmConfig.COUNTER),
+            ('tx_packets_1519_plus', PmConfig.COUNTER),
         }
         self.onu_pm_names = {
             # ('intf_id', PmConfig.CONTEXT),        # Physical device port number (PON)
@@ -140,9 +187,10 @@ class OltPmMetrics(AdapterPmMetrics):
         self._pon_ports = kwargs.pop('pon-ports', None)
 
     def update(self, pm_config):    # pylint: disable=too-many-branches
-        self.log.debug('update-config', pm_config=pm_config)
+        self.log.debug('update-pm-config', pm_config=pm_config)
         try:
-            # TODO: Test frequency override capability for a particular group
+            restart = False
+
             if self.default_freq != pm_config.default_freq:
                 if pm_config.default_freq < MIN_PM_FREQUENCY and pm_config.default_freq != 0:
                     self.log.warn('invalid-pm-frequency', value=pm_config.default_freq,
@@ -151,21 +199,29 @@ class OltPmMetrics(AdapterPmMetrics):
                 else:
                     # Update the callback to the new frequency.
                     self.default_freq = pm_config.default_freq
-
-                    if self.lp_callback is not None:
-                        if self.lp_callback.running:
-                            self.lp_callback.stop()
-
-                        if self.default_freq > 0:
-                            self.lp_callback.start(interval=self.default_freq / 10)
+                    restart = True
 
             if self.max_skew != pm_config.max_skew:
                 if MIN_PM_SKEW <= pm_config.max_skew <= MAX_PM_SKEW:
                     self.max_skew = pm_config.max_skew
+                    restart = True
 
                 else:
                     self.log.warn('invalid-pm-skew', value=pm_config.max_skew,
                                   minimum=MIN_PM_SKEW, maximum=MAX_PM_SKEW)
+
+            if restart and self.lp_callback is not None:
+                if self.lp_callback.running:
+                    self.lp_callback.stop()
+
+                if self.default_freq > 0:
+                    # Adjust next time if there is a skew
+                    interval = self.default_freq / 10
+                    if self.max_skew != 0:
+                        skew = random.uniform(-interval * (self.max_skew / 100),
+                                              interval * (self.max_skew / 100))  # nosec
+                        interval += skew
+                    self.lp_callback.start(interval=interval)
 
             if pm_config.grouped:
                 for group in pm_config.groups:
@@ -304,6 +360,7 @@ class OltPmMetrics(AdapterPmMetrics):
 
         :return: (list) metadata and metrics pairs - see description above
         """
+        self.log.debug('entry')
         if data is None:
             data = list()
 

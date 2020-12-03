@@ -17,19 +17,58 @@ import etcd3
 import etcd3.utils as utils
 
 from twisted.internet import threads
-from twisted.internet.defer import CancelledError
+from twisted.internet.defer import CancelledError, inlineCallbacks, returnValue
 from twisted.python.failure import Failure
 
-log = structlog.get_logger()
+DEFAULT_KVSTORE_RETRIES = 0
 
 
 class TwistedEtcdStore:
-
-    def __init__(self, host, port, path_prefix, timeout=None):
+    def __init__(self, host, port, path_prefix, timeout=None, default_retries=DEFAULT_KVSTORE_RETRIES):
         self._etcd = etcd3.client(host=host, port=port, timeout=timeout)
-        self.host = host
-        self.port = port
+        self._host = host
+        self._port = port
         self._path_prefix = path_prefix
+        self._default_retries = default_retries
+        self._timeout = timeout
+
+        self.log = structlog.get_logger(client='{}:{}'.format(self._host, self._port))
+        # TODO: Before deprecating the blocking 'EtcdStore' class, add support
+        #       for retries. Specifically look for a failed connection where a
+        #       a new client needs to be added.
+
+    def __str__(self):
+        return 'etcd-{}:{}/{}, Timeout: {}'.format(self._host, self._port,
+                                                   self._path_prefix, self._timeout)
+
+    @property
+    def host(self):
+        return self._host
+
+    @property
+    def port(self):
+        return self._port
+
+    @inlineCallbacks
+    def __getitem__(self, key):
+        (value, _meta) = yield self.get(self.make_path(key))
+        if value is not None:
+            returnValue(value)
+
+        raise KeyError(key)
+
+    @inlineCallbacks
+    def __contains__(self, key):
+        (value, _meta) = yield self.get(key)
+        returnValue(value is not None)
+
+    @inlineCallbacks
+    def __setitem__(self, key, value):
+        _results = yield self.set(key, value)
+
+    @inlineCallbacks
+    def __delitem__(self, key):
+        _results = yield self.delete(key)
 
     def close(self):
         client, self._etcd = self._etcd, None
@@ -41,73 +80,66 @@ class TwistedEtcdStore:
             return self._path_prefix
         return '{}/{}'.format(self._path_prefix, key)
 
-    def get(self, key):
+    def _failure(self, reason, key, operation, retries):
+        """ Common error handler """
+        if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
+            self.log.debug('{}-cancelled'.format(operation))
+        else:
+            self.log.info('{}-failure'.format(operation), error=reason, key=key)
 
+            if retries:
+                # TODO: Need to retry and set up *args, **kwargs appropriately
+                #       for the command.  Watch specifically for client connection
+                #       failures and test best way to handle this.   See also if
+                #       timeouts are supported...  The older EtcdStore() that blocked
+                #       had a small pause on the retry mechanism.
+                retries -= 1
+                self.log.debug('retries-not-yet-supported', remaining=retries)
+                # TODO: what is best way to handle callback/errback chain and can it even be
+                #       done?  May just need to watch for connection failures and determine
+                #       the best way to recover.
+
+        return reason
+
+    def get(self, key, retries=None):
         def success(results):
             (value, _meta) = results
             return value
 
-        def failure(reason):
-            if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
-                log.debug('get-cancelled')
-            else:
-                log.info('get-failure', error=reason, key=key)
-            return reason
-
         deferred = threads.deferToThread(self._etcd.get, self.make_path(key))
-        deferred.addCallback(success)
-        deferred.addErrback(failure)
+        deferred.addCallbacks(success, self._failure,
+                              errbackArgs=[key, 'get', retries or self._default_retries])
         return deferred
 
-    def set(self, key, value):
+    def set(self, key, value, retries=None):
 
         def success(results):
             if results:
                 return results
             return False
-
-        def failure(reason):
-            if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
-                log.debug('set-cancelled')
-            else:
-                log.info('set-failure', error=reason, key=key, value=value)
-            return reason
 
         deferred = threads.deferToThread(self._etcd.put, self.make_path(key), value)
-        deferred.addCallback(success)
-        deferred.addErrback(failure)
+        deferred.addCallbacks(success, self._failure,
+                              errbackArgs=[key, 'set', retries or self._default_retries])
         return deferred
 
-    def list(self, key, keys_only=False):
+    def list(self, key, keys_only=False, retries=None):
 
         def success(results):
             if results:
                 return results
             return False
 
-        def failure(reason):
-            if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
-                log.debug('list-cancelled')
-            else:
-                log.info('list-failure', error=reason, key=key)
-            return reason
-
-        deferred = threads.deferToThread(self._etcd.get_prefix, self.make_path(key), keys_only=keys_only)
-        deferred.addCallback(success)
-        deferred.addErrback(failure)
+        deferred = threads.deferToThread(self._etcd.get_prefix, self.make_path(key),
+                                         keys_only=keys_only)
+        deferred.addCallbacks(success, self._failure,
+                              errbackArgs=[key, 'list', retries or self._default_retries])
         return deferred
 
-    def watch(self, key, callback, watch_prefix=False):
+    def watch(self, key, callback, watch_prefix=False, retries=None):
 
         def success(results):
             return results
-
-        def failure(reason):
-            if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
-                log.debug('watch-cancelled')
-            else:
-                log.info('watch-failure', error=reason, key=key)
-            return reason
 
         path = self.make_path(key)
         if watch_prefix:
@@ -116,49 +148,35 @@ class TwistedEtcdStore:
         else:
             deferred = threads.deferToThread(self._etcd.add_watch_callback, path, callback)
 
-        deferred.addCallback(success)
-        deferred.addErrback(failure)
+        deferred.addCallbacks(success, self._failure,
+                              errbackArgs=[key, 'watch', retries or self._default_retries])
         return deferred
 
-    def delete(self, key):
-        log.debug('entry', key=key)
+    def delete(self, key, retries=None):
+        self.log.debug('entry', key=key)
 
         if key is None or len(key) == 0:
             raise ValueError("key-not-provided: '{}'".format(key))
 
         def success(results, k):
-            log.debug('delete-success', results=results, key=k)
+            self.log.debug('delete-success', results=results, key=k)
             if results:
                 return results
             return False
-
-        def failure(reason):
-            if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
-                log.debug('delete-cancelled')
-            else:
-                log.info('delete-failure', error=reason, key=key)
-            return reason
 
         deferred = threads.deferToThread(self._etcd.delete, self.make_path(key))
-        deferred.addCallback(success, key)
-        deferred.addErrback(failure)
+        deferred.addCallbacks(success, self._failure, callbackArgs=[key],
+                              errbackArgs=[key, 'delete', retries or self._default_retries])
         return deferred
 
-    def delete_prefix(self, prefix):
-        log.debug('entry', prefix=prefix)
+    def delete_prefix(self, prefix, retries=None):
+        self.log.debug('entry', prefix=prefix)
 
         def success(results, k):
-            log.debug('delete-prefix-success', results=results, prefix=k)
+            self.log.debug('delete-prefix-success', results=results, prefix=k)
             if results:
                 return results
             return False
-
-        def failure(reason):
-            if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
-                log.debug('delete-prefix-cancelled')
-            else:
-                log.info('delete-prefix-failure', error=reason, prefix=prefix)
-            return reason
 
         if prefix is not None and len(prefix) > 0:
             prefix = self.make_path(prefix)
@@ -169,6 +187,6 @@ class TwistedEtcdStore:
                 prefix = prefix[:-1]
 
         deferred = threads.deferToThread(self._etcd.delete_prefix, prefix)
-        deferred.addCallback(success, prefix)
-        deferred.addErrback(failure)
+        deferred.addCallbacks(success, self._failure, callbackArgs=[prefix],
+                              errbackArgs=[prefix, 'delete-prefix', retries or self._default_retries])
         return deferred
