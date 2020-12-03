@@ -33,6 +33,11 @@ Installation instruction
 
 Release Notes
 -------------
+v2.4.7 (2020-12-03)
+^^^^^^^^^^^^^^^^^^^
+
+ - Endpoint Manager work to properly read out instances when adapter scaling had been performed
+
 v2.4.6 (2020-12-03)
 ^^^^^^^^^^^^^^^^^^^
 

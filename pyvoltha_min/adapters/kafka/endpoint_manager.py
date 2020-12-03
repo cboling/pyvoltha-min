@@ -219,10 +219,15 @@ class EndpointManager:
                 if adapter.type not in self._services:
                     self._services[adapter.type] = Service(adapter.type,
                                                            adapter.totalReplicas)
+
+                service = self._services[adapter.type]
+
+                if service.total_replicas < adapter.totalReplicas:
+                    service.total_replicas = adapter.totalReplicas
+
                 current_replica = adapter.currentReplica
                 endpoint = adapter.endpoint
 
-                service = self._services[adapter.type]
                 service.endpoints[current_replica] = endpoint
 
                 key = self._make_key(adapter.id, adapter.type, adapter.type)
@@ -321,6 +326,12 @@ class Service:
     @property
     def total_replicas(self):
         return self._total_replicas
+
+    @total_replicas.setter
+    def total_replicas(self, value):
+        if value < self._total_replicas:
+            raise ValueError('Invalid Total Replicas: {}, must be > {}'.format(value, self._total_replicas))
+        self._total_replicas = value
 
     @property
     def number_of_owners(self):
