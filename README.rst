@@ -33,10 +33,12 @@ Installation instruction
 
 Release Notes
 -------------
-v2.4.7 (2020-12-03)
+v2.4.7 (2020-12-04)
 ^^^^^^^^^^^^^^^^^^^
 
  - Endpoint Manager work to properly read out instances when adapter scaling had been performed
+ - Extended interadapter IAdapter interface to pass along the 'from-adapter' topic to allow for
+   auto-learning of ONU device adapter endpoint.
 
 v2.4.6 (2020-12-03)
 ^^^^^^^^^^^^^^^^^^^

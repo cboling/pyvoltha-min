@@ -205,7 +205,7 @@ class IAdapter(object):
         if handler:
             reactor.callLater(0, handler.update_pm_config, device, pm_config)
 
-    def process_inter_adapter_message(self, msg):
+    def process_inter_adapter_message(self, msg, from_topic=None):
         raise NotImplementedError()
 
     def receive_packet_out(self, device_id, egress_port_no, msg):
@@ -286,8 +286,8 @@ class OltAdapter(IAdapter):
         handler = self.devices_handlers[proxy_address.device_id]
         handler.send_proxied_message(proxy_address, msg)
 
-    def process_inter_adapter_message(self, msg):
-        log.debug('process-inter-adapter-message', msg=msg)
+    def process_inter_adapter_message(self, msg, from_topic=None):
+        log.debug('process-inter-adapter-message', msg=msg, from_topic=from_topic)
         # Unpack the header to know which device needs to handle this message
         handler = None
         if msg.header.proxy_device_id:
@@ -298,7 +298,7 @@ class OltAdapter(IAdapter):
             # typical response
             handler = self.devices_handlers[msg.header.to_device_id]
         if handler:
-            reactor.callLater(0, handler.process_inter_adapter_message, msg)
+            reactor.callLater(0, handler.process_inter_adapter_message, msg, from_topic=from_topic)
 
     def receive_packet_out(self, device_id, egress_port_no, msg):
         try:
@@ -309,71 +309,3 @@ class OltAdapter(IAdapter):
                 reactor.callLater(0, handler.packet_out, egress_port_no, msg.data)
         except Exception as e:
             log.exception('packet-out-failure', e=e)
-
-
-"""
-ONU Adapter base class
-"""
-
-
-class OnuAdapter(IAdapter):
-    def __init__(self,
-                 core_proxy,
-                 adapter_proxy,
-                 config,
-                 device_handler_class,
-                 name,
-                 vendor,
-                 version,
-                 device_type,
-                 vendor_id,
-                 accepts_bulk_flow_update=True,
-                 accepts_add_remove_flow_updates=False,
-                 endpoint=None,
-                 current_replica=1,
-                 total_replicas=1,
-                 adapter_type=None):
-
-        super(OnuAdapter, self).__init__(core_proxy=core_proxy,
-                                         adapter_proxy=adapter_proxy,
-                                         config=config,
-                                         device_handler_class=device_handler_class,
-                                         name=name,
-                                         vendor=vendor,
-                                         version=version,
-                                         device_type=device_type,
-                                         vendor_id=vendor_id,
-                                         accepts_bulk_flow_update=accepts_bulk_flow_update,
-                                         accepts_add_remove_flow_updates=accepts_add_remove_flow_updates,
-                                         endpoint=endpoint,
-                                         current_replica=current_replica,
-                                         total_replicas=total_replicas,
-                                         adapter_type=adapter_type)
-
-    def reconcile_device(self, device):
-        self.devices_handlers[device.id] = self.device_handler_class(self,
-                                                                     device.id)
-        # Reconcile only if state was ENABLED
-        if device.admin_state == AdminState.ENABLED:
-            reactor.callLater(0,
-                              self.devices_handlers[device.id].reconcile,
-                              device)
-        return device
-
-    def receive_proxied_message(self, proxy_address, msg):
-        log.debug('receive-proxied-message', proxy_address=proxy_address,
-                 device_id=proxy_address.device_id, msg=msg)
-        # Device_id from the proxy_address is the olt device id. We need to
-        # get the onu device id using the port number in the proxy_address
-        device = self.core_proxy. \
-            get_child_device_with_proxy_address(proxy_address)
-        if device:
-            handler = self.devices_handlers[device.id]
-            handler.receive_message(msg)
-
-    def process_inter_adapter_message(self, msg):
-        log.debug('process-inter-adapter-message', msg=msg)
-        # Unpack the header to know which device needs to handle this message
-        if msg.header:
-            handler = self.devices_handlers[msg.header.to_device_id]
-            handler.process_inter_adapter_message(msg)

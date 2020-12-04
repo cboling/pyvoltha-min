@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import copy
 import structlog
 
 from twisted.internet.defer import inlineCallbacks, returnValue
@@ -61,6 +62,18 @@ class EndpointManager:
             returnValue('')
 
         returnValue(member.endpoint)
+
+    @inlineCallbacks
+    def get_all_service_endpoints(self, service_type):
+        """ Get a dict() of replica IDs -> endpoints """
+        log.debug('entry', service=service_type)
+
+        service, _device_type = yield self._get_service_and_device_type(service_type)
+        if service is None:
+            log.info('service-not-found', service=service_type)
+            returnValue(None)
+
+        returnValue(service.endpoints.copy())
 
     @inlineCallbacks
     def is_device_owned_by_service(self, device_id, service_type, replica_number):
@@ -230,7 +243,7 @@ class EndpointManager:
 
                 service.endpoints[current_replica] = endpoint
 
-                key = self._make_key(adapter.id, adapter.type, adapter.type)
+                key = self._make_key(current_replica, adapter.type, adapter.type)
                 service.add_owner(key, Member(adapter.id, adapter.type, adapter.vendor,
                                               endpoint, adapter.version, adapter.currentReplica))
 

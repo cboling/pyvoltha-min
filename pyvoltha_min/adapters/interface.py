@@ -189,7 +189,7 @@ class IAdapterInterface(Interface):
         :return: Proto Message (TBD)
         """
 
-    def process_inter_adapter_message(msg):
+    def process_inter_adapter_message(msg, from_topic=None):
         """
         Called when the adapter receives a message that was sent to it directly
         from another adapter. An adapter is automatically registered for these
@@ -197,6 +197,7 @@ class IAdapterInterface(Interface):
         the responsibility of the sending and receiving adapters to properly encode
         and decode the message.
         :param msg: Proto Message (any)
+        :param from_topic: Sending endpoint (str)
         :return: Proto Message Response
         """
 

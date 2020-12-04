@@ -81,7 +81,7 @@ class AdapterProxy(ContainerProxy):     # pylint: disable=too-few-public-methods
             if to_adapter is None:
                 to_adapter = self.remote_topic
 
-            # HACK below to handle invalid endpoint services
+            # HACK: If endpoint not provided assume a single replica instance
             if endpoint is None or len(endpoint) == 0:
                 endpoint = to_adapter + '_1'
 

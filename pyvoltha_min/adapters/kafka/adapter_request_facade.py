@@ -68,15 +68,6 @@ class AdapterRequestFacade:
     def stop(self):
         log.debug('stopping')
 
-    # @inlineCallbacks
-    # def createKafkaDeviceTopic(self, deviceId):
-    #     log.debug("subscribing-to-topic", device_id=deviceId)
-    #     kafka_proxy = get_messaging_proxy()
-    #     device_topic = kafka_proxy.get_default_topic() + "_" + deviceId
-    #     # yield kafka_proxy.create_topic(topic=device_topic)
-    #     yield kafka_proxy.subscribe(topic=device_topic, group_id=device_topic, target_cls=self, offset=KAFKA_OFFSET_EARLIEST)
-    #     log.debug("subscribed-to-topic", topic=device_topic)
-
     def start_omci_test(self, device, omcitestrequest, **_kwargs):
         if not device:
             return False, Error(code=ErrorCode.INVALID_PARAMETERS,
@@ -376,20 +367,20 @@ class AdapterRequestFacade:
     def unsuppress_event(self, event_filter, **_kwargs):
         return self.adapter.unsuppress_event(event_filter)
 
-    def process_inter_adapter_message(self, msg, **_kwargs):
+    def process_inter_adapter_message(self, msg, **kwargs):
         m = InterAdapterMessage()
         if msg:
             msg.Unpack(m)
         else:
             return False, Error(code=ErrorCode.INVALID_PARAMETERS,
                                 reason="msg-invalid")
-        log.debug('rx-message', message=m)
-        # max_retry = 0
-        # TODO: NOTE as per VOL-3223 a race condition on ONU_IND_REQUEST may occur,
-        #       so if that's the message retry up to 10 times was the old way to handle
-        #       this.  In tibit adapter, I am pausing 1 second but plan to watch admin_state
-        #       for it to exit PREPROVISIONING and go to ENABLED to indicate 'adopt' was received from core
-        return True, self.adapter.process_inter_adapter_message(m)
+        from_topic = StrType()
+        topic = kwargs.get('fromTopic')
+        if topic:
+            topic.Unpack(from_topic)
+
+        log.debug('rx-message', message=m, from_topic=from_topic)
+        return True, self.adapter.process_inter_adapter_message(m, from_topic=from_topic.val)
 
     def receive_packet_out(self, deviceId, outPort, packet, **_kwargs):
         try:
