@@ -19,7 +19,8 @@ Adapter abstract base class
 """
 
 import structlog
-from twisted.internet import reactor
+from twisted.internet import reactor, task
+from twisted.internet.defer import succeed
 from voltha_protos.adapter_pb2 import Adapter
 from voltha_protos.adapter_pb2 import AdapterConfig
 from voltha_protos.common_pb2 import AdminState
@@ -198,9 +199,27 @@ class IAdapter(object):
                               flow_changes.to_add.items, flow_metadata)
         return device
 
+    def get_ext_value(self, device_id, device, value_flag):
+        log.debug("adapter-get-ext-value", device=device, device_id=device_id)
+
+        if device_id not in self.devices_handlers:
+            return succeed(None)
+
+        handler = self.devices_handlers[device.id]
+
+        def success(results):
+            log.info('get-ext-value-success', results=results)
+            return results
+
+        def failure(reason):
+            log.warn('get-ext-value-failure', results=reason)
+            return reason
+
+        d = task.deferLater(reactor, 0, handler.get_ext_value(device, value_flag))
+        return d.addCallbacks(success, failure)
+
     def update_pm_config(self, device, pm_config):
-        log.info("adapter-update-pm-config", device=device,
-                 pm_config=pm_config)
+        log.debug("adapter-update-pm-config", device=device, pm_config=pm_config)
         handler = self.devices_handlers[device.id]
         if handler:
             reactor.callLater(0, handler.update_pm_config, device, pm_config)

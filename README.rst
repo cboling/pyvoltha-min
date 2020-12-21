@@ -33,6 +33,20 @@ Installation instruction
 
 Release Notes
 -------------
+v2.5.1 (2020-12-21)
+^^^^^^^^^^^^^^^^^^^
+
+ - Support for force-delete adapter
+ - Added jaeger-client for log correlation and span support
+ - Added get_ext_value() IAdapter interface
+
+v2.5.0 (2020-12-21)
+^^^^^^^^^^^^^^^^^^^
+
+ - Upgraded Voltha-protos requirements to 4.0.5 tag. This is the VOLTHA v2.5 tag
+   plus 3 additional protobuf changes from VOLTHA v2.6 that will have little impact
+   until additional capabilities are added to device adapters that need them.
+
 v2.4.7 (2020-12-04)
 ^^^^^^^^^^^^^^^^^^^
 

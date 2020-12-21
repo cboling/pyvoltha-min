@@ -27,8 +27,8 @@ from voltha_protos.inter_container_pb2 import IntType, InterAdapterMessage, StrT
 from voltha_protos.device_pb2 import Device, Port, ImageDownload, SimulateAlarmRequest, PmConfigs
 from voltha_protos.openflow_13_pb2 import FlowChanges, FlowGroups, Flows, \
     FlowGroupChanges, ofp_packet_out
-from voltha_protos.voltha_pb2 import OmciTestRequest, FlowMetadata
-from pyvoltha_min.adapters.kafka.kafka_inter_container_library import  get_messaging_proxy, \
+from voltha_protos.voltha_pb2 import OmciTestRequest, FlowMetadata, ValueSpecifier
+from pyvoltha_min.adapters.kafka.kafka_inter_container_library import get_messaging_proxy, \
     ARG_FROM_TOPIC
 
 log = structlog.get_logger()
@@ -424,3 +424,26 @@ class AdapterRequestFacade:
                                 reason="simulate-alarm-request-invalid")
 
         return True, self.adapter.simulate_alarm(d, req)
+
+    def get_ext_value(self, deviceId, device, value_flag, **_kwargs):
+
+        if deviceId:
+            t = StrType()
+            deviceId.Unpack(t)
+        else:
+            return False, Error(code=ErrorCode.INVALID_PARAMETER,
+                                reason="device-id")
+        if device:
+            dev = Device()
+            device.Unpack(dev)
+        else:
+            return False, Error(code=ErrorCode.INVALID_PARAMETERS,
+                                reason="device-invalid")
+        if value_flag:
+            value = ValueSpecifier()
+            value_flag.Unpack(value)
+        else:
+            return False, Error(code=ErrorCode.INVALID_PARAMETERS,
+                                reason="value-flag-invalid")
+
+        return True, self.adapter.get_ext_value(t.val, dev, value)
