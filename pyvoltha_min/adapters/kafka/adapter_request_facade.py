@@ -19,7 +19,7 @@ This facade handles kafka-formatted messages from the Core, extracts the kafka
 formatting and forwards the request to the concrete handler.
 """
 import structlog
-from twisted.internet.defer import inlineCallbacks
+from twisted.internet.defer import inlineCallbacks, returnValue
 from zope.interface import implementer
 
 from pyvoltha_min.adapters.interface import IAdapterInterface
@@ -27,6 +27,7 @@ from voltha_protos.inter_container_pb2 import IntType, InterAdapterMessage, StrT
 from voltha_protos.device_pb2 import Device, Port, ImageDownload, SimulateAlarmRequest, PmConfigs
 from voltha_protos.openflow_13_pb2 import FlowChanges, FlowGroups, Flows, \
     FlowGroupChanges, ofp_packet_out
+from voltha_protos.extensions_pb2 import SingleGetValueRequest
 from voltha_protos.voltha_pb2 import OmciTestRequest, FlowMetadata, ValueSpecifier
 from pyvoltha_min.adapters.kafka.kafka_inter_container_library import get_messaging_proxy, \
     ARG_FROM_TOPIC
@@ -447,3 +448,15 @@ class AdapterRequestFacade:
                                 reason="value-flag-invalid")
 
         return True, self.adapter.get_ext_value(t.val, dev, value)
+
+    @inlineCallbacks
+    def single_get_value_request(self, request, **kwargs):
+        req = SingleGetValueRequest()
+        if request:
+            request.Unpack(req)
+        else:
+            return False, Error(code=ErrorCode.INVALID_PARAMETERS,
+                                reason="request-invalid")
+        result = yield self.adapter.single_get_value_request(req)
+        res = yield result
+        return True, res

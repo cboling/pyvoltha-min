@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
 """
 Interface definition for Voltha Adapters
 """
 from zope.interface import Interface
+# pylint: skip-file
 
 
 class IAdapterInterface(Interface):
@@ -198,6 +198,20 @@ class IAdapterInterface(Interface):
         and decode the message.
         :param msg: Proto Message (any)
         :param from_topic: Sending endpoint (str)
+        :return: Proto Message Response
+        """
+
+    def single_get_value_request(msg):
+        """
+        Retrive a single type of attribute from a device.
+        :param msg: Proto Message (any)
+        :return: Proto Message Response
+        """
+
+    def single_set_value_request(msg):
+        """
+        Set a single type of attribute of a device.
+        :param msg: Proto Message (any)
         :return: Proto Message Response
         """
 

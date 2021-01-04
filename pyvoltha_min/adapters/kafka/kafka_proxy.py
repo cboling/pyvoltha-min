@@ -297,11 +297,11 @@ class KafkaProxy(object):
             log.debug("unsubscribing-to-topic-release-lock", topic=topic)
 
     @inlineCallbacks
-    def send_message(self, topic, msg, key=None):
+    def send_message(self, topic, msg, key=None, span=None):
         # first check whether we have a kafka producer.
+        error = None
         try:
             if self.faulty is False:
-
                 if self.kproducer is None:
                     self._get_kafka_producer()
                     # Lets the next message request do the retry if still a failure
@@ -326,8 +326,8 @@ class KafkaProxy(object):
         except Exception as e:
             self.faulty = True
             self.alive_state_handler.callback(self.alive)
-            log.error('failed-to-send-kafka-msg', topic=topic,
-                      e=e)
+            error = 'failed to send kafka-msg'
+            log.error(error, topic=topic, e=e)
 
             # set the kafka producer to None.  This is needed if the
             # kafka docker went down and comes back up with a different
@@ -346,6 +346,12 @@ class KafkaProxy(object):
             else:
                 log.info('already-stopping-kafka-proxy')
             return
+
+        finally:
+            if span is not None:
+                if error:
+                    span.error(error)
+                span.finish()
 
     # sending heartbeat message to check the readiness
     def send_heartbeat_message(self, topic, msg):

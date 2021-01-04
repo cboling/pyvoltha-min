@@ -22,7 +22,8 @@ VENVDIR			:= venv-pyvoltha-min
 TESTVENVDIR		:= ${VENVDIR}-test
 VENV_BIN		?= virtualenv
 VENV_OPTS		?= --python=python3.6 -v
-# VENV_OPTS		?= --python=python3.8 -v    NOTE: Still stay on 3.6 for the time being until full regression performed
+#VENV_OPTS		?= --python=python3.7 -v
+#VENV_OPTS		?= --python=python3.8 -v
 COVERAGE_OPTS	= --with-xcoverage --with-xunit --cover-package=pyvoltha-min\
                   --cover-html --cover-html-dir=tmp/cover
 PYLINT_OUT		= $(WORKING_DIR)pylint.out

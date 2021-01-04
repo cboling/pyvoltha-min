@@ -21,8 +21,7 @@ Adapter abstract base class
 import structlog
 from twisted.internet import reactor, task
 from twisted.internet.defer import succeed
-from voltha_protos.adapter_pb2 import Adapter
-from voltha_protos.adapter_pb2 import AdapterConfig
+from voltha_protos.adapter_pb2 import Adapter, AdapterConfig
 from voltha_protos.common_pb2 import AdminState
 from voltha_protos.device_pb2 import DeviceType, DeviceTypes
 from voltha_protos.health_pb2 import HealthStatus
@@ -33,8 +32,10 @@ from .interface import IAdapterInterface
 log = structlog.get_logger()
 
 
+# pylint: disable=too-many-arguments, too-many-public-methods, abstract-method
+
 @implementer(IAdapterInterface)
-class IAdapter(object):
+class IAdapter:
     def __init__(self,
                  core_proxy,
                  adapter_proxy,
@@ -90,7 +91,7 @@ class IAdapter(object):
     def device_types(self):
         return DeviceTypes(items=self.supported_device_types)
 
-    def health(self):
+    def health(self):       # pylint: disable=no-self-use
         # return HealthStatus(state=HealthStatus.HealthState.HEALTHY)
         return HealthStatus(state=HealthStatus.HEALTHY)
 
@@ -236,20 +237,25 @@ class IAdapter(object):
     def unsuppress_event(self, filter):
         raise NotImplementedError()
 
+    def single_get_value_request(self, request):
+        raise NotImplementedError()
+
+    def single_set_value_request(self, request):
+        raise NotImplementedError()
+
     def _get_handler(self, device):
         if device.id in self.devices_handlers:
             handler = self.devices_handlers[device.id]
             if handler is not None:
                 return handler
             return None
-
-
-"""
-OLT Adapter base class
-"""
+        return None
 
 
 class OltAdapter(IAdapter):
+    """
+    OLT Adapter base class
+    """
     def __init__(self,
                  core_proxy,
                  adapter_proxy,
@@ -266,21 +272,21 @@ class OltAdapter(IAdapter):
                  total_replicas=1,
                  adapter_type=None):
 
-        super(OltAdapter, self).__init__(core_proxy=core_proxy,
-                                         adapter_proxy=adapter_proxy,
-                                         config=config,
-                                         device_handler_class=device_handler_class,
-                                         name=name,
-                                         vendor=vendor,
-                                         version=version,
-                                         device_type=device_type,
-                                         vendor_id=None,
-                                         accepts_bulk_flow_update=accepts_bulk_flow_update,
-                                         accepts_add_remove_flow_updates=accepts_add_remove_flow_updates,
-                                         endpoint=endpoint,
-                                         current_replica=current_replica,
-                                         total_replicas=total_replicas,
-                                         adapter_type=adapter_type)
+        super().__init__(core_proxy=core_proxy,
+                         adapter_proxy=adapter_proxy,
+                         config=config,
+                         device_handler_class=device_handler_class,
+                         name=name,
+                         vendor=vendor,
+                         version=version,
+                         device_type=device_type,
+                         vendor_id=None,
+                         accepts_bulk_flow_update=accepts_bulk_flow_update,
+                         accepts_add_remove_flow_updates=accepts_add_remove_flow_updates,
+                         endpoint=endpoint,
+                         current_replica=current_replica,
+                         total_replicas=total_replicas,
+                         adapter_type=adapter_type)
         self.logical_device_id_to_root_device_id = dict()
 
     def reconcile_device(self, device):

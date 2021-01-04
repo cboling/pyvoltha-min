@@ -33,6 +33,21 @@ Installation instruction
 
 Release Notes
 -------------
+v2.5.2 (2022-01-04)
+^^^^^^^^^^^^^^^^^^^
+
+ - Upgraded VOLTHA protos to v4.0.7.  This is the latest as of 1/4/2021 and is post-
+   v2.6 release but all changes between the v2.5 release do not cause an issue with
+   v2.5 OLT device adapters (python) and will allow for easier support of v2.6 features
+   such as the individual get/set value requests (which are ONU-only at this time)
+ - Added IAdapter support for single_get/set_value_request
+ - Added initial jaeger tracing (basic support) for log correlation and trace
+   needs in VOLTHA v2.5+ adapters.  Basic support includes root spans on
+   adapter originated requests and simple child span support on incoming kafka
+   requests.  More elaborate scope/context support is scheduled for a future
+   version as having a trace that has an overall-span length with actual async
+   work sub-spans are a bit more complex to implement.
+
 v2.5.1 (2020-12-21)
 ^^^^^^^^^^^^^^^^^^^
 

@@ -10,7 +10,7 @@ netifaces       == 0.10.9
 protobuf        == 3.14.0
 structlog       == 20.1.0
 txaioetcd       == 18.10.2
-voltha-protos   == 4.0.5
+voltha-protos   == 4.0.7
 
 # Log correlation
 jaeger-client   == 4.3.0

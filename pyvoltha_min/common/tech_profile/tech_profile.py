@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import os
 import re
 import json
 from collections import namedtuple
@@ -213,7 +214,13 @@ class TechProfile:
     pbits = ['0b11111111']
 
     # Tech profile path prefix in kv store
-    KV_STORE_TECH_PROFILE_PATH_PREFIX = 'service/voltha/technology_profiles'
+    if "KV_STORE_DATAPATH_PREFIX" in os.environ:
+        kv_store_prefix = os.environ["KV_STORE_DATAPATH_PREFIX"]
+    else:
+        kv_store_prefix = "service/voltha"
+    KV_STORE_TECH_PROFILE_PATH_PREFIX = '%s/technology_profiles' % kv_store_prefix
+
+    log.debug("kv-store-tech-profile-prefix", kv_store_tech_profile_prefix=KV_STORE_TECH_PROFILE_PATH_PREFIX)
 
     # Tech profile path in kv store
     TECH_PROFILE_PATH = '{}/{}'  # <technology>/<table_id>
