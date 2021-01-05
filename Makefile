@@ -21,9 +21,8 @@ PACKAGE_DIR     := $(WORKING_DIR)pyvoltha_min
 VENVDIR			:= venv-pyvoltha-min
 TESTVENVDIR		:= ${VENVDIR}-test
 VENV_BIN		?= virtualenv
-VENV_OPTS		?= --python=python3.6 -v
-#VENV_OPTS		?= --python=python3.7 -v
-#VENV_OPTS		?= --python=python3.8 -v
+#VENV_OPTS		?= --python=python3.6 -v
+VENV_OPTS		?= --python=python3.8 -v
 COVERAGE_OPTS	= --with-xcoverage --with-xunit --cover-package=pyvoltha-min\
                   --cover-html --cover-html-dir=tmp/cover
 PYLINT_OUT		= $(WORKING_DIR)pylint.out
@@ -35,23 +34,23 @@ help:
 	@echo "Usage: make [<target>]"
 	@echo "where available targets are:"
 	@echo
-	@echo "help          : Print this help"
+	@echo "help            : Print this help"
 	@echo "test            : Run all unit test"
 	@echo "lint            : Run pylint on package"
 	@echo
-	@echo "dist          : Create source distribution of the python package"
-	@echo "check         : run twine check on distribution"
-	@echo "upload        : Upload test version of python package to test.pypi.org"
+	@echo "dist            : Create source distribution of the python package"
+	@echo "check           : run twine check on distribution"
+	@echo "upload          : Upload test version of python package to test.pypi.org"
 	@echo
-	@echo "venv          : Build local Python virtualenv"
-	@echo "venv-test     : Build local Python unit test and lint virtualenv"
+	@echo "venv            : Build local Python virtualenv"
+	@echo "venv-test       : Build local Python unit test and lint virtualenv"
 	@echo
 	@echo "show-licenses   : Show imported modules and licenses"
 	@echo "bandit-test     : Run bandit security test on package code"
 	@echo "bandit-test-all : Run bandit security test on package and imported code"
 	@echo
-	@echo "clean         : Remove files created by the build and tests"
-	@echo "distclean     : Remove files created by the build and tests and virtual environments"
+	@echo "clean           : Remove files created by the build and tests"
+	@echo "distclean       : Remove files created by the build and tests and virtual environments"
 
 # ignore these directories
 .PHONY: test dist
