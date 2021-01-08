@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+# pylint: disable=too-few-public-methods, too-many-arguments, import-error
+
 import os
 import re
 import json
@@ -220,8 +222,6 @@ class TechProfile:
         kv_store_prefix = "service/voltha"
     KV_STORE_TECH_PROFILE_PATH_PREFIX = '%s/technology_profiles' % kv_store_prefix
 
-    log.debug("kv-store-tech-profile-prefix", kv_store_tech_profile_prefix=KV_STORE_TECH_PROFILE_PATH_PREFIX)
-
     # Tech profile path in kv store
     TECH_PROFILE_PATH = '{}/{}'  # <technology>/<table_id>
 
@@ -259,20 +259,15 @@ class TechProfile:
     AES_ENCRYPTION = 'aes_encryption'
 
     def __init__(self, resource_mgr):
-        try:
-            self.args = registry('main').get_args()
-            self.resource_mgr = resource_mgr
+        self.args = registry('main').get_args()
+        self.resource_mgr = resource_mgr
 
-            # KV store's IP Address and PORT
-            host, port = self.args.kv_store_address.split(':', 1)
-            self._kv_store = EtcdStore(
-                host, port, TechProfile.
-                KV_STORE_TECH_PROFILE_PATH_PREFIX)
-            # self.tech_profile_instance_store = dict()
-
-        except Exception as e:
-            log.exception("exception-in-init")
-            raise Exception(e)
+        # KV store's IP Address and PORT
+        host, port = self.args.kv_store_address.split(':', 1)
+        self._kv_store = EtcdStore(
+            host, port, TechProfile.
+            KV_STORE_TECH_PROFILE_PATH_PREFIX)
+        # self.tech_profile_instance_store = dict()
 
     @property
     def kv_store(self):
@@ -319,7 +314,7 @@ class TechProfile:
 
             tech_profile_instance = TechProfileInstance(uni_port_name, tech_profile,
                                                         self.resource_mgr, intf_id,
-                                                        self._kv_store)
+                                                        path, self._kv_store)
             self._add_tech_profile_instance(path,
                                             tech_profile_instance.to_json())
         except Exception as e:
@@ -383,7 +378,7 @@ class TechProfile:
 
         except KeyError as e:
             log.info("Get-tech-profile-failed", exception=e, path=path)
-            return None
+        return None
 
     def _default_tech_profile(self):
         # Default tech profile
@@ -437,59 +432,37 @@ class TechProfile:
 
         upstream_gem_port_attribute_list = list()
         downstream_gem_port_attribute_list = list()
-        us_gemport_attr_list = tech_profile[
-            TechProfile.UPSTREAM_GEM_PORT_ATTRIBUTE_LIST]
-        for i in range(len(us_gemport_attr_list)):
-            upstream_gem_port_attribute_list.append(
-                GemPortAttribute(pbit_map=us_gemport_attr_list[i][TechProfile.PBIT_MAP],
-                                 discard_config=DiscardConfig(
-                                     max_threshold=
-                                     us_gemport_attr_list[i][TechProfile.DISCARD_CONFIG][
-                                         TechProfile.MAX_THRESHOLD],
-                                     min_threshold=
-                                     us_gemport_attr_list[i][TechProfile.DISCARD_CONFIG][
-                                         TechProfile.MIN_THRESHOLD],
-                                     max_probability=
-                                     us_gemport_attr_list[i][TechProfile.DISCARD_CONFIG][
-                                         TechProfile.MAX_PROBABILITY]),
-                                 discard_policy=us_gemport_attr_list[i][
-                                     TechProfile.DISCARD_POLICY],
-                                 priority_q=us_gemport_attr_list[i][
-                                     TechProfile.PRIORITY_Q],
-                                 weight=us_gemport_attr_list[i][TechProfile.WEIGHT],
-                                 scheduling_policy=us_gemport_attr_list[i][
-                                     TechProfile.SCHEDULING_POLICY],
-                                 max_q_size=us_gemport_attr_list[i][
-                                     TechProfile.MAX_Q_SIZE],
-                                 aes_encryption=us_gemport_attr_list[i][
-                                     TechProfile.AES_ENCRYPTION]))
+        us_gemport_attr_list = tech_profile[TechProfile.UPSTREAM_GEM_PORT_ATTRIBUTE_LIST]
 
-        ds_gemport_attr_list = tech_profile[
-            TechProfile.DOWNSTREAM_GEM_PORT_ATTRIBUTE_LIST]
-        for i in range(len(ds_gemport_attr_list)):
-            downstream_gem_port_attribute_list.append(
-                GemPortAttribute(pbit_map=ds_gemport_attr_list[i][TechProfile.PBIT_MAP],
+        for attr in us_gemport_attr_list:
+            upstream_gem_port_attribute_list.append(
+                GemPortAttribute(pbit_map=attr[TechProfile.PBIT_MAP],
                                  discard_config=DiscardConfig(
-                                     max_threshold=
-                                     ds_gemport_attr_list[i][TechProfile.DISCARD_CONFIG][
-                                         TechProfile.MAX_THRESHOLD],
-                                     min_threshold=
-                                     ds_gemport_attr_list[i][TechProfile.DISCARD_CONFIG][
-                                         TechProfile.MIN_THRESHOLD],
-                                     max_probability=
-                                     ds_gemport_attr_list[i][TechProfile.DISCARD_CONFIG][
-                                         TechProfile.MAX_PROBABILITY]),
-                                 discard_policy=ds_gemport_attr_list[i][
-                                     TechProfile.DISCARD_POLICY],
-                                 priority_q=ds_gemport_attr_list[i][
-                                     TechProfile.PRIORITY_Q],
-                                 weight=ds_gemport_attr_list[i][TechProfile.WEIGHT],
-                                 scheduling_policy=ds_gemport_attr_list[i][
-                                     TechProfile.SCHEDULING_POLICY],
-                                 max_q_size=ds_gemport_attr_list[i][
-                                     TechProfile.MAX_Q_SIZE],
-                                 aes_encryption=ds_gemport_attr_list[i][
-                                     TechProfile.AES_ENCRYPTION]))
+                                     max_threshold=attr[TechProfile.DISCARD_CONFIG][TechProfile.MAX_THRESHOLD],
+                                     min_threshold=attr[TechProfile.DISCARD_CONFIG][TechProfile.MIN_THRESHOLD],
+                                     max_probability=attr[TechProfile.DISCARD_CONFIG][TechProfile.MAX_PROBABILITY]),
+                                 discard_policy=attr[TechProfile.DISCARD_POLICY],
+                                 priority_q=attr[TechProfile.PRIORITY_Q],
+                                 weight=attr[TechProfile.WEIGHT],
+                                 scheduling_policy=attr[TechProfile.SCHEDULING_POLICY],
+                                 max_q_size=attr[TechProfile.MAX_Q_SIZE],
+                                 aes_encryption=attr[TechProfile.AES_ENCRYPTION]))
+
+        ds_gemport_attr_list = tech_profile[TechProfile.DOWNSTREAM_GEM_PORT_ATTRIBUTE_LIST]
+
+        for attr in ds_gemport_attr_list:
+            downstream_gem_port_attribute_list.append(
+                GemPortAttribute(pbit_map=attr[TechProfile.PBIT_MAP],
+                                 discard_config=DiscardConfig(
+                                     max_threshold=attr[TechProfile.DISCARD_CONFIG][TechProfile.MAX_THRESHOLD],
+                                     min_threshold=attr[TechProfile.DISCARD_CONFIG][TechProfile.MIN_THRESHOLD],
+                                     max_probability=attr[TechProfile.DISCARD_CONFIG][TechProfile.MAX_PROBABILITY]),
+                                 discard_policy=attr[TechProfile.DISCARD_POLICY],
+                                 priority_q=attr[TechProfile.PRIORITY_Q],
+                                 weight=attr[TechProfile.WEIGHT],
+                                 scheduling_policy=attr[TechProfile.SCHEDULING_POLICY],
+                                 max_q_size=attr[TechProfile.MAX_Q_SIZE],
+                                 aes_encryption=attr[TechProfile.AES_ENCRYPTION]))
 
         return TechProfile.DefaultTechProfile(
             tech_profile[TechProfile.NAME],
@@ -571,7 +544,7 @@ class TechProfile:
         return tconts
 
     @staticmethod
-    def get_parameter(param_type, param_value):
+    def get_parameter(param_type, param_value):     # pylint: disable=too-many-branches
         parameter = None
         try:
             if param_type == 'direction':
@@ -596,12 +569,12 @@ class TechProfile:
 
 
 class EponProfile(TechProfile):
-    def __init__(self, _resource_mgr):
-        raise NotImplemented('TODO: Not yet implemented')
+    def __init__(self, _resource_mgr):  # pylint: disable=super-init-not-called
+        raise NotImplementedError('TODO: Not yet implemented')
 
     class DefaultTechProfile:
         def __init__(self, _name, **_kwargs):
-            raise NotImplemented('TODO: Not yet implemented')
+            raise NotImplementedError('TODO: Not yet implemented')
 
         def to_json(self):
             return json.dumps(self, default=lambda o: o.__dict__,
