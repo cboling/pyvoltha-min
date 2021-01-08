@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pylint: disable=import-error
+
 import codecs
 from uuid import uuid4
 import json
@@ -24,29 +26,31 @@ from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, returnValue, Deferred, \
     DeferredQueue, succeed
 
+from zope.interface import implementer
+
 from opentracing import global_tracer, Format
 from voltha_protos.inter_container_pb2 import MessageType, Argument, \
     InterContainerRequestBody, InterContainerMessage, InterContainerResponseBody, StrType, \
     InterAdapterMessage
-from google.protobuf.any_pb2 import Any
-
-from zope.interface import implementer
+from voltha_protos.inter_container_pb2 import _INTERADAPTERMESSAGETYPE_TYPES as IA_MSG_ENUM
 
 from pyvoltha_min.common.utils import asleep
 from pyvoltha_min.common.utils.tracing import NilScope, create_async_span, create_child_span
 from pyvoltha_min.common.utils.registry import IComponent
 from .kafka_proxy import KafkaProxy, get_kafka_proxy
 
+
 log = structlog.get_logger()
 
 KAFKA_OFFSET_LATEST = 'latest'
 KAFKA_OFFSET_EARLIEST = 'earliest'
 ARG_FROM_TOPIC = 'fromTopic'
-
+SPAN_ARG = 'span'
+MESSAGE_KEY = 'msg'
+PROCESS_IA_MSG_RPC = 'process_inter_adapter_message'
 ROOT_SPAN_NAME_KEY = 'op-name'
 
 # TODO: Look at rw-core transaction ID implications to this library
-# TODO: Support OpenTracing API
 # TODO: Go-lang version has a kafka client liveness/healthiness channel, should this one?
 
 
@@ -69,15 +73,13 @@ class IKafkaMessagingProxy:
         Initialize the kafka proxy.  This is a singleton (may change to
         non-singleton if performance is better)
         :param kafka_host_port: Kafka host and port
-        :param kv_store: Key-Value store
         :param default_topic: Default topic to subscribe to
         :param target_cls: target class - method of that class is invoked
         when a message is received on the default_topic
         """
         # return an exception if the object already exist
         if IKafkaMessagingProxy._kafka_messaging_instance:
-            raise Exception(
-                'Singleton-exist', cls=IKafkaMessagingProxy)
+            raise Exception('Singleton-exist')
 
         log.debug("Initializing-KafkaProxy")
         self.kafka_host_port = kafka_host_port
@@ -163,7 +165,7 @@ class IKafkaMessagingProxy:
 
             except Exception as e:
                 log.exception("Exception-when-stopping-messaging-proxy:", e=e)
-                pass  # TODO: Only success for now
+                # TODO: Only success for now
 
         return d
 
@@ -231,12 +233,12 @@ class IKafkaMessagingProxy:
         :param offset: The topic offset on the kafka bus from where message consumption will start
         :return: True on success, False on failure
         """
-        RETRY_BACKOFF = [0.05, 0.1, 0.2, 0.5, 1, 2, 5]
+        retry_backoff = [0.05, 0.1, 0.2, 0.5, 1, 2, 5]
 
         def _backoff(msg, retries):
             log.debug('backing-off', retries=retries)
-            wait_time = RETRY_BACKOFF[min(retries,
-                                          len(RETRY_BACKOFF) - 1)]
+            wait_time = retry_backoff[min(retries,
+                                          len(retry_backoff) - 1)]
             log.info(msg, retry_in=wait_time)
             return asleep.asleep(wait_time)
 
@@ -287,8 +289,8 @@ class IKafkaMessagingProxy:
 
             if callback is not None and topic in self.topic_callback_map:
                 index = 0
-                for cb in self.topic_callback_map[topic]:
-                    if cb == callback:
+                for topic_cb in self.topic_callback_map[topic]:
+                    if topic_cb == callback:
                         break
                     index += 1
                 if index < len(self.topic_callback_map[topic]):
@@ -296,10 +298,9 @@ class IKafkaMessagingProxy:
 
                 if len(self.topic_callback_map[topic]) == 0:
                     del self.topic_callback_map[topic]
+
         except Exception as e:
-            log.exception("Exception-when-unsubscribing-to-topic", topic=topic,
-                          e=e)
-            return e
+            log.exception("Exception-when-unsubscribing-to-topic", topic=topic, e=e)
 
     @inlineCallbacks
     def _enqueue_received_group_message(self, msg):
@@ -318,7 +319,7 @@ class IKafkaMessagingProxy:
                 log.exception("Failed-enqueueing-received-message", e=e)
 
     @inlineCallbacks
-    def _received_message_processing_loop(self):
+    def _received_message_processing_loop(self):    # pylint: disable=no-self-use
         """
         Internal method to continuously process all received messages one
         at a time
@@ -335,20 +336,17 @@ class IKafkaMessagingProxy:
                 log.exception("Failed-dequeueing-received-message", e=e)
         log.debug("exiting")
 
-    def _to_string(self, unicode_str):
+    @staticmethod
+    def _to_string(unicode_str):
         if unicode_str is not None:
             if isinstance(unicode_str, six.string_types):
                 return unicode_str
 
             return codecs.encode(unicode_str, 'ascii')
-        else:
-            return None
+        return None
 
-    def _format_request(self,
-                        rpc,
-                        to_topic,
-                        reply_topic,
-                        **kwargs):
+    @staticmethod
+    def _format_request(rpc, to_topic, reply_topic, **kwargs):
         """
         Format a request to send over kafka
         :param rpc: Requested remote API
@@ -377,14 +375,16 @@ class IKafkaMessagingProxy:
 
             request.header.timestamp.GetCurrentTime()
             request_body.rpc = rpc
-            for a, b in kwargs.items():
+            for key, value in kwargs.items():
                 arg = Argument()
-                arg.key = a
+                arg.key = key
                 try:
-                    arg.value.Pack(b)
+                    arg.value.Pack(value)
                     request_body.args.extend([arg])
+
                 except Exception as e:
-                    log.exception("Failed-parsing-value", e=e)
+                    log.exception("Failed-parsing-value", e=e, key=key)
+
             request.body.Pack(request_body)
             return request, transaction_id, response_required
 
@@ -396,7 +396,8 @@ class IKafkaMessagingProxy:
                           args=kwargs)
             return None, None, None
 
-    def _format_response(self, msg_header, msg_body, status):
+    @staticmethod
+    def _format_response(msg_header, msg_body, status):
         """
         Format a response
         :param msg_header: The header portion of a received request
@@ -425,7 +426,8 @@ class IKafkaMessagingProxy:
                           body=msg_body, status=status, e=e)
             return None
 
-    def _parse_response(self, msg):
+    @staticmethod
+    def _parse_response(msg):
         try:
             message = InterContainerMessage()
             message.ParseFromString(msg)
@@ -444,7 +446,7 @@ class IKafkaMessagingProxy:
             return None
 
     @inlineCallbacks
-    def _handle_message(self, m):
+    def _handle_message(self, msg):     # pylint: disable=too-many-locals, too-many-branches
         """
         Default internal method invoked for every batch of messages received
         from Kafka.
@@ -452,39 +454,32 @@ class IKafkaMessagingProxy:
         if self.stopped:
             returnValue(None)
 
-        def _augment_args_with_FromTopic(args, from_topic):
+        def _augment_args_with_from_topic(args, from_topic):
             arg = Argument(key=ARG_FROM_TOPIC)
-            t = StrType(val=from_topic)
-            arg.value.Pack(t)
+            arg.value.Pack(StrType(val=from_topic))
             args.extend([arg])
             return args
 
-        def _toDict(args):
+        def _to_dict(args):
             """
             Convert a repeatable Argument type into a python dictionary
             :param args: Repeatable core_adapter.Argument type
             :return: a python dictionary
             """
-            if args is None:
-                return None
-            result = {}
-            for arg in args:
-                result[arg.key] = arg.value
-            return result
+            return {arg.key: arg.value for arg in args} if args is not None else None
 
         try:
-            val = m.value()
-            log.debug("Got Message", message=m)
-            # val = m.message.value
-            # print m.topic
+            val = msg.value()
+            log.debug("rx-msg", message=msg)
 
             # Go over customized callbacks first
-            m_topic = m.topic()
-            if m_topic in self.topic_callback_map:
-                for c in self.topic_callback_map[m_topic]:
-                    yield c(val)
+            m_topic = msg.topic()
 
-            #  Check whether we need to process request/response scenario
+            if m_topic in self.topic_callback_map:
+                for topic_cb in self.topic_callback_map[m_topic]:
+                    yield topic_cb(val)
+
+            # Check whether we need to process request/response scenario
             if m_topic not in self.topic_target_cls_map:
                 returnValue(None)
 
@@ -517,7 +512,7 @@ class IKafkaMessagingProxy:
                         # requestBody.Args = kp.addTransactionId(ctx, msg.Header.Id, requestBody.Args)
 
                         # Augment the request arguments with the from_topic
-                        augmented_args = _augment_args_with_FromTopic(msg_body.args,
+                        augmented_args = _augment_args_with_from_topic(msg_body.args,
                                                                       msg_body.reply_to_topic)
                         try:
                             if augmented_args:
@@ -526,7 +521,7 @@ class IKafkaMessagingProxy:
                                           reply_to_topic=msg_body.reply_to_topic)
                                 (status, res) = yield getattr(
                                     self.topic_target_cls_map[targetted_topic],
-                                    self._to_string(msg_body.rpc))(**_toDict(augmented_args))
+                                    self._to_string(msg_body.rpc))(**_to_dict(augmented_args))
                             else:
                                 log.debug("message-body-args-absent", rpc=msg_body.rpc,
                                           response_required=msg_body.response_required,
@@ -544,7 +539,7 @@ class IKafkaMessagingProxy:
                                 if response is not None:
                                     res_topic = self._to_string(response.header.to_topic)
                                     res_span, span = span, None
-                                    self._send_kafka_message(res_topic, response, res_span)
+                                    self.send_kafka_message(res_topic, response, res_span)
 
                                 log.debug("Response-sent", to_topic=res_topic)
 
@@ -566,29 +561,25 @@ class IKafkaMessagingProxy:
                 log.error("!!INVALID-TRANSACTION-TYPE!!")
 
         except Exception as e:
-            log.exception("Failed-to-process-message", message=m, e=e)
+            log.exception("Failed-to-process-message", message=msg, e=e)
 
     @inlineCallbacks
-    def _send_kafka_message(self, topic, msg, span):
+    def send_kafka_message(self, topic, msg, span):
         if self.kafka_proxy is not None:
             log.debug('sending', topic=topic, message=msg)
             try:
                 yield self.kafka_proxy.send_message(topic, msg.SerializeToString(), span=span)
 
             except Exception as e:
-                log.exception("Failed-sending-message", message=msg, e=e)
+                log.info("failed-sending-message", message=msg, e=e)
 
         elif span is not None:
             span.error('kafka-proxy not available')
             span.finish()
 
     @inlineCallbacks
-    def send_request(self,
-                     rpc,
-                     to_topic,
-                     reply_topic=None,
-                     callback=None,
-                     **kwargs):
+    def send_request(self, rpc, to_topic, reply_topic=None,   # pylint: disable=too-many-branches
+                     callback=None, **kwargs):
         """
         Invoked to send a message to a remote container and receive a response if required
 
@@ -611,10 +602,10 @@ class IKafkaMessagingProxy:
         try:
             # Embed opentrace span
             is_async = not reply_topic
-            span_arg, span, ctx = self.embed_span_as_arg(ctx, rpc, is_async)
+            span_arg, span, ctx = self.embed_span_as_arg(ctx, rpc, is_async, kwargs.get(MESSAGE_KEY))
 
             if span_arg is not None:
-                kwargs['span'] = span_arg
+                kwargs[SPAN_ARG] = span_arg
 
             # Ensure all strings are not unicode encoded
             rpc = self._to_string(rpc)
@@ -647,7 +638,7 @@ class IKafkaMessagingProxy:
             else:
                 async_span = None
 
-            yield self._send_kafka_message(to_topic, request, async_span)
+            yield self.send_kafka_message(to_topic, request, async_span)
 
             log.debug("message-sent", transaction_id=transaction_id, to_topic=to_topic,
                       from_topic=reply_topic, rpc=rpc)
@@ -675,17 +666,18 @@ class IKafkaMessagingProxy:
                         else:
                             returnValue((res.success, None))
                 else:
-                    raise KafkaMessagingError(error="failed-response-for-request:{}".format(request))
+                    raise KafkaMessagingError("failed-response-for-request:{}".format(request))
 
         except Exception as e:
             log.exception("Exception-sending-request", e=e)
-            raise KafkaMessagingError(error=e)
+            raise KafkaMessagingError(e) from e
 
         finally:
             if span is not None:
                 span.finish()
 
-    def embed_span_as_arg(self, ctx, rpc, is_async):
+    @staticmethod
+    def embed_span_as_arg(ctx, rpc, is_async, msg=None):
         """
         Method to extract Open-tracing Span from Context and serialize it for transport over Kafka embedded
         as a additional argument.
@@ -695,10 +687,10 @@ class IKafkaMessagingProxy:
         The span name is automatically constructed using the RPC name with following convention
         (<rpc-name> represents name of invoked method):
 
-            - RPC invoked in Sync manner (WaitForResponse=true) : kafka-rpc-<rpc-name>
-            - RPC invoked in Async manner (WaitForResponse=false) : kafka-async-rpc-<rpc-name>
-            - Inter Adapter RPC invoked in Sync manner (WaitForResponse=true) : kafka-inter-adapter-rpc-<rpc-name>
-            - Inter Adapter RPC invoked in Async manner (WaitForResponse=false) : kafka-inter-adapter-async-rpc-<rpc-name>
+          - RPC invoked in Sync manner (WaitForResponse=true) : kafka-rpc-<rpc-name>
+          - RPC invoked in Async manner (WaitForResponse=false) : kafka-async-rpc-<rpc-name>
+          - Inter Adapter RPC invoked in Sync manner (WaitForResponse=true) : kafka-inter-adapter-rpc-<rpc-name>
+          - Inter Adapter RPC invoked in Async manner (WaitForResponse=false) : kafka-inter-adapter-async-rpc-<rpc-name>
         """
         tracer = global_tracer()
         if tracer is None:
@@ -708,24 +700,22 @@ class IKafkaMessagingProxy:
             span_name = 'kafka-'
 
             # In case of inter adapter message, use Msg Type for constructing RPC name
-            if rpc == 'process_inter_adapter_message':
-                msg_type = 'unknown'  # TODO: Get interadapter message type such as ONU_IND_REQUEST
+            if rpc == PROCESS_IA_MSG_RPC:
                 span_name += 'inter-adapter-'
-                rpc = str(msg_type)
+                msg_type = msg.header.type
+                try:
+                    rpc = IA_MSG_ENUM.values_by_number[msg_type].name
 
-            # 	if rpc == "process_inter_adapter_message" {
-            # 		if msgType, ok := ctx.Value("inter-adapter-msg-type").(ic.InterAdapterMessageType_Types); ok {
-            # 			spanName.WriteString("inter-adapter-")
-            # 			rpc = msgType.String()
-            # 		}
-            # 	}
+                except Exception as _e:
+                    rpc = 'msg-type-{}'.format(msg_type)
+
             span_name += 'async-rpc-' if is_async else 'rpc-'
             span_name += rpc
 
             if is_async:
-                span_to_inject, new_context = create_async_span(ctx, span_name)
+                span_to_inject, ctx = create_async_span(ctx, span_name)
             else:
-                span_to_inject, new_context = create_child_span(ctx, span_name)
+                span_to_inject, ctx = create_child_span(ctx, span_name)
 
             if span_to_inject is None:
                 return None, None, ctx
@@ -733,25 +723,17 @@ class IKafkaMessagingProxy:
             span_to_inject.set_baggage_item('rpc-span-name', span_name)
 
             text_map = dict()
-            try:
-                tracer.inject(span_to_inject, Format.TEXT_MAP, text_map)
-                text_map_json = json.dumps(text_map, indent=None, separators=(',', ':'))
+            tracer.inject(span_to_inject, Format.TEXT_MAP, text_map)
+            text_map_json = json.dumps(text_map, indent=None, separators=(',', ':'))
+            span_arg = StrType(val=text_map_json)
 
-            except Exception as e:
-                log.exception('unable-to-serialize-span-to-textmap', e=e)
-                return None, span_to_inject, ctx
-
-            span_arg = {'span', text_map_json}
-            # 	spanArg := make([]KVArg, 1)
-            # 	spanArg[0] = KVArg{Key: "span", Value: &ic.StrType{Val: string(textMapJson)}}
-            # 	return spanArg, spanToInject, newCtx
-            # }
             return span_arg, span_to_inject, ctx
 
         except Exception as _e:
             return None, None, ctx
 
-    def enrich_context_with_span(self, rpc_name, args):
+    @staticmethod
+    def enrich_context_with_span(rpc_name, args):
         """
         Method to extract the Span embedded in Kafka RPC request on the receiver side.
 
@@ -767,7 +749,7 @@ class IKafkaMessagingProxy:
 
         try:
             for arg in args:
-                if arg.key == 'span' and arg.value is not None:
+                if arg.key == SPAN_ARG and arg.value is not None:
                     text_map_string = StrType()
                     arg.value.Unpack(text_map_string)
 
@@ -784,14 +766,19 @@ class IKafkaMessagingProxy:
         # If here, no active span found in request, start a new span instead
         span_name = 'kafka-'
 
-        if rpc_name == "process_inter_adapter_message":
-            for key, arg in args.items():
-                if key == 'msg':
+        if rpc_name == PROCESS_IA_MSG_RPC:
+            for arg in args:
+                if arg.key == MESSAGE_KEY:
                     ia_msg = InterAdapterMessage()
-                    arg.Unpack(ia_msg)
-
+                    arg.value.Unpack(ia_msg)
                     span_name += 'inter-adapter-'
-                    rpc_name = str(ia_msg.header.type)
+                    msg_type = ia_msg.header.type
+                    try:
+                        rpc_name = IA_MSG_ENUM.values_by_number[msg_type].name
+
+                    except Exception as _e:
+                        rpc_name = 'msg-type-{}'.format(msg_type)
+                    break
 
         span_name += 'rpc-' + rpc_name
 
@@ -801,4 +788,5 @@ class IKafkaMessagingProxy:
 
 # Common method to get the singleton instance of the kafka proxy class
 def get_messaging_proxy():
+    # pylint: disable=protected-access
     return IKafkaMessagingProxy._kafka_messaging_instance

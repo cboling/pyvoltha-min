@@ -174,7 +174,6 @@ class KafkaProxy(object):
         return d
 
     def _get_kafka_producer(self):
-
         try:
             _k_endpoint = self.kafka_endpoint
             self.kproducer = _kafkaProducer({'bootstrap.servers': _k_endpoint, })
@@ -207,6 +206,7 @@ class KafkaProxy(object):
                 log.debug('invoking callbacks', topic=topic, count=len(self.topic_callbacks_map))
                 for cb in self.topic_callbacks_map[topic]:
                     yield cb(msg)
+
             except Exception as e:
                 log.debug("exception-receiving-msg", topic=topic, e=e)
 

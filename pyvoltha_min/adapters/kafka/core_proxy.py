@@ -38,8 +38,7 @@ def createSubTopic(*args):
 class CoreProxy(ContainerProxy):
 
     def __init__(self, kafka_proxy, default_core_topic, default_event_topic, my_listening_topic):
-        super(CoreProxy, self).__init__(kafka_proxy, default_core_topic,
-                                        my_listening_topic)
+        super().__init__(kafka_proxy, default_core_topic, my_listening_topic)
         self.core_default_topic = default_core_topic
         self.event_default_topic = default_event_topic
         self.deviceId_to_core_map = dict()
@@ -580,7 +579,8 @@ class CoreProxy(ContainerProxy):
     @inlineCallbacks
     def submit_event(self, event_msg):
         try:
-            res = yield self.kafka_proxy._send_kafka_message(self.event_default_topic, event_msg)
+            res = yield self.kafka_proxy.send_kafka_message(self.event_default_topic, event_msg, None)
             returnValue(res)
+
         except Exception as e:
             log.exception('failed-event-submission', type=type(event_msg), e=e)
