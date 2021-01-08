@@ -509,7 +509,7 @@ class IKafkaMessagingProxy:
                         # // let the callee unpack the arguments as its the only one that knows the real proto type
                         # // Augment the requestBody with the message Id as it will be used in scenarios where cores
                         # // are set in pairs and competing
-                        # requestBody.Args = kp.addTransactionId(ctx, msg.Header.Id, requestBody.Args)
+                        # requestBody.Args = kp.addTransactionId(msg.Header.Id, requestBody.Args)
 
                         # Augment the request arguments with the from_topic
                         augmented_args = _augment_args_with_from_topic(msg_body.args,
@@ -597,12 +597,11 @@ class IKafkaMessagingProxy:
         if self.stopped:
             returnValue(None)
 
-        ctx = None      # TODO: Add context to event loop/reactor and defers
         span = None
         try:
             # Embed opentrace span
             is_async = not reply_topic
-            span_arg, span, ctx = self.embed_span_as_arg(ctx, rpc, is_async, kwargs.get(MESSAGE_KEY))
+            span_arg, span = self.embed_span_as_arg(rpc, is_async, kwargs.get(MESSAGE_KEY))
 
             if span_arg is not None:
                 kwargs[SPAN_ARG] = span_arg
@@ -677,7 +676,7 @@ class IKafkaMessagingProxy:
                 span.finish()
 
     @staticmethod
-    def embed_span_as_arg(ctx, rpc, is_async, msg=None):
+    def embed_span_as_arg(rpc, is_async, msg=None):
         """
         Method to extract Open-tracing Span from Context and serialize it for transport over Kafka embedded
         as a additional argument.
@@ -694,7 +693,7 @@ class IKafkaMessagingProxy:
         """
         tracer = global_tracer()
         if tracer is None:
-            return None, None, ctx
+            return None, None
 
         try:
             span_name = 'kafka-'
@@ -713,12 +712,12 @@ class IKafkaMessagingProxy:
             span_name += rpc
 
             if is_async:
-                span_to_inject, ctx = create_async_span(ctx, span_name)
+                span_to_inject = create_async_span(span_name)
             else:
-                span_to_inject, ctx = create_child_span(ctx, span_name)
+                span_to_inject = create_child_span(span_name)
 
             if span_to_inject is None:
-                return None, None, ctx
+                return None, None
 
             span_to_inject.set_baggage_item('rpc-span-name', span_name)
 
@@ -727,10 +726,10 @@ class IKafkaMessagingProxy:
             text_map_json = json.dumps(text_map, indent=None, separators=(',', ':'))
             span_arg = StrType(val=text_map_json)
 
-            return span_arg, span_to_inject, ctx
+            return span_arg, span_to_inject
 
         except Exception as _e:
-            return None, None, ctx
+            return None, None
 
     @staticmethod
     def enrich_context_with_span(rpc_name, args):

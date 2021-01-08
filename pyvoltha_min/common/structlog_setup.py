@@ -29,8 +29,10 @@ try:
 except ImportError:
     from _dummy_thread import get_ident as _get_ident
 
+from pyvoltha_min.common.utils.tracing import extract_context_attributes
 
-class StructuredLogRenderer(object):
+
+class StructuredLogRenderer:    # pylint: disable=too-few-public-methods
     def __call__(self, logger, name, event_dict):
         # in order to keep structured log data in event_dict to be forwarded as
         # is, we need to pass it into the logger framework as the first
@@ -41,8 +43,8 @@ class StructuredLogRenderer(object):
 
 
 class EncoderFix(json.JSONEncoder):
-    def default(self, obj):
-        return str(obj)
+    def default(self, o):
+        return str(o)
 
 
 class JsonRenderedOrderedDict(OrderedDict):
@@ -68,6 +70,14 @@ class JsonRenderedOrderedDict(OrderedDict):
                                   cls=EncoderFix,
                                   separators=(', ', ': '),
                                   sort_keys=True)[1:-1]
+
+            # Extract trace fields for log correlation
+            log_correlation_fields = extract_context_attributes(None)
+
+            if log_correlation_fields:
+                json_msg += ',' + json.dumps(log_correlation_fields, indent=None,
+                                             separators=(', ', ': '))[1:-1]
+
             return msg + json_msg
 
         finally:

@@ -14,7 +14,9 @@
 
 import threading
 import structlog
-from opentracing import global_tracer, Tracer, tags, Span
+import functools
+from twisted.internet import defer
+from opentracing import global_tracer, Tracer, tags, Span, Scope
 from jaeger_client import Span as JaegerSpan, SpanContext as JaegerSpanContext
 
 ROOT_SPAN_KEY_NAME = "op-name"
@@ -90,7 +92,7 @@ class _TracingSupport:
     @scope_manager.setter
     def scope_manager(self, value):
         if self._scope_manager is None:
-            self._active_trace_agent_address = value
+            self._scope_manager = value
 
 
 GlobalTracingSupport = _TracingSupport()
@@ -120,8 +122,8 @@ class NilScope:
         return 'NilScope'
 
 
-def create_async_span(_ctx, _span_name):
-    return None, None
+def create_async_span(_span_name, ignore_active_span=False):
+    return None
 
     # // Creates a Async Child Span with Follows-From relationship from Parent Span embedded in passed context.
     # // Should be used only in scenarios when
@@ -158,26 +160,25 @@ def create_async_span(_ctx, _span_name):
     # }
 
 
-def create_child_span(ctx, task_name, **kwargs):
+def create_child_span(task_name, ignore_active_span=False, **kwargs):
     """
-    Creates a Child Span from Parent Span embedded in passed context. Should be used before starting a new major
-    operation in Synchronous or Asynchronous mode (go routine), such as following:
+    Creates a Child Span from Parent Span embedded in current context context. Should be used before
+    starting a new major operation in Synchronous or Asynchronous mode (go routine), such as following:
 
         1. Start of all implemented External API methods unless using a interceptor for auto-injection
            of Span (Server side impl)
         2. Just before calling an Third-Party lib which is invoking a External API (etcd, kafka)
         3. In start of a Go Routine responsible for performing a major task involving significant duration
         4. Any method which is suspected to be time consuming...
-
     """
     tracer = global_tracer()
     if tracer is None or not (GlobalTracingSupport.log_correlation_status or
                               GlobalTracingSupport.trace_publishing_status):
         # return nop tracer
-        return Tracer().start_span(task_name), ctx
+        return Tracer().start_span(task_name)
 
     parent_span = tracer.active_span
-    child_span = tracer.start_span(task_name, child_of=parent_span)
+    child_span = tracer.start_span(task_name, child_of=parent_span, ignore_active_span=ignore_active_span)
     #     parentSpan := opentracing.SpanFromContext(ctx)
     #     childSpan, newCtx := opentracing.StartSpanFromContext(ctx, taskName)
 
@@ -185,10 +186,7 @@ def create_child_span(ctx, task_name, **kwargs):
         child_span.set_baggage_item(ROOT_SPAN_KEY_NAME, task_name)
 
     enrich_span(child_span, **kwargs)
-    return child_span, ctx
-    #     EnrichSpan(newCtx, keyAndValues...)
-    #     return childSpan, newCtx
-    # }
+    return child_span
 
 
 def enrich_span(span, **kwargs):
@@ -290,3 +288,131 @@ def mark_span_error(_ctx, error):
     if span is not None:
         span.set_tag(tags.ERROR, True)
         span.set_tag('err', error)
+
+
+def get_current_span():
+    """
+    Access current request context and extract current Span from it.
+    :return:
+        Return current span associated with the current request context.
+        If no request context is present in thread local, or the context
+        has no span, return None.
+    """
+    if GlobalTracingSupport.log_correlation_status or GlobalTracingSupport.trace_publishing_status:
+        active_scope = GlobalTracingSupport.scope_manager.active
+        return active_scope.span if active_scope else None
+
+    return None
+
+
+def span_in_context(span):
+    """
+    Create a context manager that stores the given span in the requested contex
+    :param span: OpenTracing Span
+    :return:
+        Return context manager that wraps the request context.
+    """
+    # Return a no-op Scope if None was specified.
+    if span is None or GlobalTracingSupport.scope_manager is None:
+        return Scope(None, None)
+
+    return GlobalTracingSupport.scope_manager.activate(span, False)
+
+
+def traced_function(func=None, name=None, on_start=None, ignore_active_span=False,
+                    require_active_trace=False, async_result=False):
+    """
+    A decorator that enables tracing of the wrapped function or
+    twisted deferred routine provided there is a parent span already established.
+    .. code-block:: python
+        @traced_function
+        def my_function1(arg1, arg2=None)
+            ...
+    :param func: decorated function or Twisted deferred routine
+    :param name: optional name to use as the Span.operation_name.
+        If not provided, func.__name__ will be used.
+    :param on_start: an optional callback to be executed once the child span
+        is started, but before the decorated function is called. It can be
+        used to set any additional tags on the span, perhaps by inspecting
+        the decorated function arguments. The callback must have a signature
+        `(span, *args, *kwargs)`, where the last two collections are the
+        arguments passed to the actual decorated function.
+        .. code-block:: python
+            def extract_call_site_tag(span, *args, *kwargs)
+                if 'call_site_tag' in kwargs:
+                    span.set_tag('call_site_tag', kwargs['call_site_tag'])
+            @traced_function(on_start=extract_call_site_tag)
+            @inlineCallback                                         TODO: InlineCallback not yet supported fully
+            def my_function(arg1, arg2=None, call_site_tag=None)
+                ...
+    :param require_active_trace: controls what to do when there is no active
+        trace. If require_active_trace=True, then no span is created.
+        If require_active_trace=False, a new trace is started.
+    :param async_result: if a parent trace is present, this specifies that the
+        span will finish asynchronously (possibly after) the parent span and should be
+        treated as more as 'follows-from'
+    :return: returns a tracing decorator
+    """
+    if func is None:
+        return functools.partial(traced_function, name=name,
+                                 on_start=on_start, ignore_active_span=ignore_active_span,
+                                 require_active_trace=require_active_trace,
+                                 async_result=async_result)
+
+    operation_name = name if name else func.__name__
+
+    @functools.wraps(func)
+    def decorator(*args, **kwargs):
+        parent_span = get_current_span() if not ignore_active_span else None
+        if parent_span is None and require_active_trace:
+            return func(*args, **kwargs)
+
+        tracer = global_tracer()
+        if async_result:
+            reference_span, parent_span = parent_span, None
+        else:
+            reference_span = None
+
+        with tracer.start_active_span(operation_name, child_of=parent_span,
+                                      references=reference_span, ignore_active_span=ignore_active_span,
+                                      finish_on_close=False) as scope:
+            span = scope.span
+
+            if callable(on_start):
+                on_start(span, *args, **kwargs)
+
+            # We explicitly invoke deactivation callback for the StackContext,
+            # because there are scenarios when it gets retained forever, for
+            # example when a Periodic Callback is scheduled lazily while in the
+            # scope of a tracing StackContext.
+            try:
+                d = func(*args, **kwargs)
+
+                # Twisted routines and inlineCallbacks generate defers
+                if isinstance(d, defer.Deferred):
+                    def done(results):
+                        span.finish()
+                        return results
+
+                    def failed(reason):
+                        # Set error in span
+                        span.log(event='exception', payload=reason)
+                        span.set_tag('error', 'true')
+                        span.finish()
+                        return reason
+
+                    if d.called:
+                        span.finish()
+                    else:
+                        d.addCallbacks(done, failed)
+                else:
+                    span.finish()
+                return d
+
+            except Exception as e:
+                span.set_tag(tags.ERROR, 'true')
+                span.log(event='exception', payload=e)
+                span.finish()
+                raise
+
+    return decorator

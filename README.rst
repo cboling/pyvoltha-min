@@ -33,6 +33,16 @@ Installation instruction
 
 Release Notes
 -------------
+v2.5.3 (2022-01-08)
+^^^^^^^^^^^^^^^^^^^
+ - Moving to Python 3.8 as base version for PIP virtual environment installs. But
+   version 3.5+ are also okay to use in your end product.  Mainly chose 3.8 since
+   it is a fairly recent version and there are performance improvements in the later
+   versions as well that I want to make use of in the OLT adapters that use this
+   library
+ - Bug fixes/improvements to OpenTracing API calls to better align with OpenOLT & Core
+ - Pylint cleanup in a number of files
+
 v2.5.2 (2022-01-04)
 ^^^^^^^^^^^^^^^^^^^
 
