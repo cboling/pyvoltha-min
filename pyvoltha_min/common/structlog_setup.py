@@ -65,19 +65,18 @@ class JsonRenderedOrderedDict(OrderedDict):
                 return ''
 
             # Convert to JSON but strip off outside '{}'
-            msg = '"msg":"{}",'.format(self.pop('event'))
+            msg = '"msg":"{}",'.format(self.pop('event', 'n/a'))
             json_msg = json.dumps(self, indent=None,
                                   cls=EncoderFix,
                                   separators=(', ', ': '),
                                   sort_keys=True)[1:-1]
 
             # Extract trace fields for log correlation
-            log_correlation_fields = extract_context_attributes(None)
+            log_correlation_fields = extract_context_attributes()
 
             if log_correlation_fields:
                 json_msg += ',' + json.dumps(log_correlation_fields, indent=None,
                                              separators=(', ', ': '))[1:-1]
-
             return msg + json_msg
 
         finally:
