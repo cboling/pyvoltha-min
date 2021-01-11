@@ -13,10 +13,11 @@
 # limitations under the License.
 
 import threading
-import structlog
 import functools
+import structlog
+
 from twisted.internet import defer
-from opentracing import global_tracer, Tracer, tags, Span, Scope
+from opentracing import global_tracer, tags, Span
 from jaeger_client import Span as JaegerSpan, SpanContext as JaegerSpanContext
 
 ROOT_SPAN_KEY_NAME = "op-name"
@@ -122,7 +123,7 @@ class NilScope:
         return 'NilScope'
 
 
-def create_async_span(_span_name, ignore_active_span=False):
+def create_async_span(_span_name, _ignore_active_span=False):
     return None
 
     # // Creates a Async Child Span with Follows-From relationship from Parent Span embedded in passed context.
@@ -172,10 +173,10 @@ def create_child_span(task_name, ignore_active_span=False, **kwargs):
         4. Any method which is suspected to be time consuming...
     """
     tracer = global_tracer()
-    if tracer is None or not (GlobalTracingSupport.log_correlation_status or
-                              GlobalTracingSupport.trace_publishing_status):
-        # return nop tracer
-        return Tracer().start_span(task_name)
+    # if tracer is None or not (GlobalTracingSupport.log_correlation_status or
+    #                           GlobalTracingSupport.trace_publishing_status):
+    #     # return nop tracer
+    #     return Tracer().start_span(task_name)
 
     parent_span = tracer.active_span
     child_span = tracer.start_span(task_name, child_of=parent_span, ignore_active_span=ignore_active_span)
@@ -220,9 +221,9 @@ def span_from_context(ctx):
     return None
 
 
-def extract_context_attributes(ctx):
+def extract_context_attributes():
     """
-    Extracts details of Execution Context as log fields from the Tracing Span
+    Extracts details of current context as log fields from the Tracing Span
     injected into the context instance. Following log fields are extracted:
 
         -  Operation Name : key as 'op-name' and value as Span operation name
@@ -234,45 +235,46 @@ def extract_context_attributes(ctx):
     If no Span is found associated with context, blank slice is returned without
     any log fields
 
-    :param ctx: (Context object)
-
     :return: (dict) of fields or None
     """
-    if not GlobalTracingSupport.log_correlation_status or ctx is None:
+    if not GlobalTracingSupport.log_correlation_status:
         return None
 
-    fields = dict()
+    span = global_tracer().active_span
+    if not isinstance(span, JaegerSpan):
+        return None
+
+    op_id = span.trace_id & 0xFFFFFFFFFFFFFFFF   # Lower 64-bits only
+    op_name = span.get_baggage_item(ROOT_SPAN_KEY_NAME)
+    task_id = span.span_id
+    task_name = span.operation_name
+
+    if not op_name:
+        span.set_baggage_item(ROOT_SPAN_KEY_NAME, task_name)
+        op_name = task_name
+
+    fields = {'op-id': '{:016x}'.format(op_id), 'op-name': op_name}
+
+    if task_id != op_id:
+        fields['task-id'] = '{:016x}'.format(task_id)
+        fields['task-name'] = task_name
+
     try:
-        span = span_from_context(ctx)
+        for key, value in span.tags:
+            # Ignore the special tags added by Jaeger, middleware (sampler.type, span.*)
+            # present in the span
+            if any(key.startswith(prefix) for prefix in ('sampler.', 'span.', 'component.')):
+                continue
 
-        if isinstance(span, JaegerSpan):
-            op_id = span.trace_id & 0xFFFFFFFFFFFFFFFF   # Lower 64-bits
-            op_name = span.get_baggage_item(ROOT_SPAN_KEY_NAME)
-            task_id = span.span_id
-            task_name = span.operation_name
+            fields[key] = value
 
-            if not op_name:
-                span.set_baggage_item(ROOT_SPAN_KEY_NAME, task_name)
-                op_name = task_name
+    except Exception as _e:
+        pass
 
-            fields['op-id'] = op_id
-            fields['op-name'] = op_name
-
-            if task_id != op_id:
-                fields['task-id'] = op_name
-                fields['task-name'] = task_name
-
-            for key, value in span.tags:
-                # Ignore the special tags added by Jaeger, middleware (sampler.type, span.*)
-                # present in the span
-                if any(key.startswith(prefix) for prefix in ('sampler.', 'span.', 'component.')):
-                    continue
-
+    try:
+        for key, value in span.context.baggage.items():
+            if key != 'rpc-span-name':
                 fields[key] = value
-
-            for key, value in span.context.baggage.items():
-                if key != 'rpc-span-name':
-                    fields[key] = value
 
     except Exception as _e:
         pass
@@ -280,43 +282,15 @@ def extract_context_attributes(ctx):
     return fields
 
 
-def mark_span_error(_ctx, error):
-    """ Inject error information into the span """
-    tracing = global_tracer()
-    span = tracing.active_span if tracing is not None else None
+def mark_span_error(error=None):
+    """ Inject error information into the currently active span """
 
+    span = global_tracer().active_span
     if span is not None:
         span.set_tag(tags.ERROR, True)
-        span.set_tag('err', error)
 
-
-def get_current_span():
-    """
-    Access current request context and extract current Span from it.
-    :return:
-        Return current span associated with the current request context.
-        If no request context is present in thread local, or the context
-        has no span, return None.
-    """
-    if GlobalTracingSupport.log_correlation_status or GlobalTracingSupport.trace_publishing_status:
-        active_scope = GlobalTracingSupport.scope_manager.active
-        return active_scope.span if active_scope else None
-
-    return None
-
-
-def span_in_context(span):
-    """
-    Create a context manager that stores the given span in the requested contex
-    :param span: OpenTracing Span
-    :return:
-        Return context manager that wraps the request context.
-    """
-    # Return a no-op Scope if None was specified.
-    if span is None or GlobalTracingSupport.scope_manager is None:
-        return Scope(None, None)
-
-    return GlobalTracingSupport.scope_manager.activate(span, False)
+        if error is not None:
+            span.set_tag('err', error)
 
 
 def traced_function(func=None, name=None, on_start=None, ignore_active_span=False,
@@ -329,33 +303,39 @@ def traced_function(func=None, name=None, on_start=None, ignore_active_span=Fals
         def my_function1(arg1, arg2=None)
             ...
     :param func: decorated function or Twisted deferred routine
+
     :param name: optional name to use as the Span.operation_name.
-        If not provided, func.__name__ will be used.
+                 If not provided, func.__name__ will be used.
+
     :param on_start: an optional callback to be executed once the child span
-        is started, but before the decorated function is called. It can be
-        used to set any additional tags on the span, perhaps by inspecting
-        the decorated function arguments. The callback must have a signature
-        `(span, *args, *kwargs)`, where the last two collections are the
-        arguments passed to the actual decorated function.
-        .. code-block:: python
-            def extract_call_site_tag(span, *args, *kwargs)
-                if 'call_site_tag' in kwargs:
-                    span.set_tag('call_site_tag', kwargs['call_site_tag'])
-            @traced_function(on_start=extract_call_site_tag)
-            @inlineCallback                                         TODO: InlineCallback not yet supported fully
-            def my_function(arg1, arg2=None, call_site_tag=None)
+                     is started, but before the decorated function is called. It can be
+                     used to set any additional tags on the span, perhaps by inspecting
+                     the decorated function arguments. The callback must have a signature
+                     `(span, *args, *kwargs)`, where the last two collections are the
+                     arguments passed to the actual decorated function.
+                     .. code-block:: python
+                         def extract_call_site_tag(span, *args, *kwargs)
+                             if 'call_site_tag' in kwargs:
+                                 span.set_tag('call_site_tag', kwargs['call_site_tag'])
+                         @traced_function(on_start=extract_call_site_tag)
+                         @inlineCallback             TODO: InlineCallback not yet supported fully/tested
+                         def my_function(arg1, arg2=None, call_site_tag=None)
                 ...
     :param require_active_trace: controls what to do when there is no active
-        trace. If require_active_trace=True, then no span is created.
-        If require_active_trace=False, a new trace is started.
+                                 trace. If require_active_trace=True, then no span is created.
+                                 If require_active_trace=False, a new trace is started.
+
     :param async_result: if a parent trace is present, this specifies that the
-        span will finish asynchronously (possibly after) the parent span and should be
-        treated as more as 'follows-from'
+                         span will (may) finish asynchronously (possibly after) the parent span
+                         and should be treated as more as 'follows-from'
+
+    :param ignore_active_span: if true, start a new root span, ignoring any currently active one
+
     :return: returns a tracing decorator
     """
     if func is None:
-        return functools.partial(traced_function, name=name,
-                                 on_start=on_start, ignore_active_span=ignore_active_span,
+        return functools.partial(traced_function, name=name, on_start=on_start,
+                                 ignore_active_span=ignore_active_span,
                                  require_active_trace=require_active_trace,
                                  async_result=async_result)
 
@@ -363,7 +343,7 @@ def traced_function(func=None, name=None, on_start=None, ignore_active_span=Fals
 
     @functools.wraps(func)
     def decorator(*args, **kwargs):
-        parent_span = get_current_span() if not ignore_active_span else None
+        parent_span = global_tracer().active_span if not ignore_active_span else None
         if parent_span is None and require_active_trace:
             return func(*args, **kwargs)
 
