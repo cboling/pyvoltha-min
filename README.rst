@@ -33,7 +33,13 @@ Installation instruction
 
 Release Notes
 -------------
-v2.5.3 (2022-01-08)
+v2.5.4 (2021-01-11)
+^^^^^^^^^^^^^^^^^^^
+ - Bugfix: Corrected trace-id and scan-id output to log. Should be hex lowercase
+           values instead of integers
+ - Corrected release date. v2.5.2 and v2.5.3 both had 2022 as the year
+
+v2.5.3 (2021-01-08)
 ^^^^^^^^^^^^^^^^^^^
  - Moving to Python 3.8 as base version for PIP virtual environment installs. But
    version 3.5+ are also okay to use in your end product.  Mainly chose 3.8 since
@@ -43,7 +49,7 @@ v2.5.3 (2022-01-08)
  - Bug fixes/improvements to OpenTracing API calls to better align with OpenOLT & Core
  - Pylint cleanup in a number of files
 
-v2.5.2 (2022-01-04)
+v2.5.2 (2021-01-04)
 ^^^^^^^^^^^^^^^^^^^
 
  - Upgraded VOLTHA protos to v4.0.7.  This is the latest as of 1/4/2021 and is post-
