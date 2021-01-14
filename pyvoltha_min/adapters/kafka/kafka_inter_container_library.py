@@ -35,7 +35,7 @@ from voltha_protos.inter_container_pb2 import MessageType, Argument, \
 from voltha_protos.inter_container_pb2 import _INTERADAPTERMESSAGETYPE_TYPES as IA_MSG_ENUM
 
 from pyvoltha_min.common.utils import asleep
-from pyvoltha_min.common.utils.tracing import NilScope, create_async_span, create_child_span
+from pyvoltha_min.common.utils.tracing import create_async_span, create_child_span
 from pyvoltha_min.common.utils.registry import IComponent
 from .kafka_proxy import KafkaProxy, get_kafka_proxy
 
@@ -51,7 +51,6 @@ PROCESS_IA_MSG_RPC = 'process_inter_adapter_message'
 ROOT_SPAN_NAME_KEY = 'op-name'
 
 # TODO: Look at rw-core transaction ID implications to this library
-# TODO: Go-lang version has a kafka client liveness/healthiness channel, should this one?
 
 
 class KafkaMessagingError(Exception):
@@ -500,7 +499,7 @@ class IKafkaMessagingProxy:
 
                 # Extract opentrace span from the message
                 with self.enrich_context_with_span(msg_body.rpc, msg_body.args) as scope:
-                    log.debug('rx-span', operation=scope.span.operation_name)
+                    log.debug('rx-span')
                     span = scope.span if scope is not None else None
 
                     if targetted_topic in self.topic_target_cls_map:
@@ -558,7 +557,7 @@ class IKafkaMessagingProxy:
                     resp = self._parse_response(val)
                     self.transaction_id_deferred_map[trns_id].callback(resp)
             else:
-                log.error("!!INVALID-TRANSACTION-TYPE!!")
+                log.error("INVALID-TRANSACTION-TYPE")
 
         except Exception as e:
             log.exception("Failed-to-process-message", message=msg, e=e)
@@ -742,9 +741,6 @@ class IKafkaMessagingProxy:
         for RPC calls coming from components currently not sending the span (e.g. openonu adapter)
         """
         tracer = global_tracer()
-
-        if tracer is None:
-            return NilScope()
 
         try:
             for arg in args:

@@ -17,148 +17,45 @@ import functools
 import structlog
 
 from twisted.internet import defer
-from opentracing import global_tracer, tags, Span
+from opentracing import global_tracer, tags
 from jaeger_client import Span as JaegerSpan, SpanContext as JaegerSpanContext
+
+from pyvoltha_min.adapters.log_features import GlobalTracingSupport
 
 ROOT_SPAN_KEY_NAME = "op-name"
 
 log = structlog.get_logger()
 
 
-class _TracingSupport:
-    def __init__(self):
-        self._log_correlation_enabled = None
-        self._trace_publishing_enabled = None
-        self._component_name = None
-        self._active_trace_agent_address = None
-        self._scope_manager = None
+def create_async_span(span_name, ignore_active_span=False, **kwargs):
+    """
+    Creates a Async Child Span with Follows-From relationship from Parent Span embedded
+    in passed context.
 
-    @property
-    def log_correlation_status(self):
-        return self._log_correlation_enabled is not None and self._log_correlation_enabled
+    Should be used only in scenarios when
+      a) There is dis-continuation in execution and thus result of Child span does
+          not affect the Parent flow at all
+      b) The execution of Child Span is guaranteed to start after the completion
+         of Parent Span
 
-    @log_correlation_status.setter
-    def log_correlation_status(self, value):
-        if not isinstance(value, bool):
-            raise TypeError('Boolean required')
-        if self._log_correlation_enabled is not None:
-            raise ValueError('Log Correlation has already been set to {}'.format(self._log_correlation_enabled))
+    In case of any confusion, use CreateChildSpan method
 
-        self._log_correlation_enabled = value
+    Some situations where this method would be suitable includes Kafka Async RPC
+    call, Propagation of Event across a channel etc.
+    """
+    tracer = global_tracer()
 
-    @property
-    def trace_publishing_status(self):
-        return self._trace_publishing_enabled is not None and self._trace_publishing_enabled
+    if not (GlobalTracingSupport.log_correlation_status or GlobalTracingSupport.trace_publishing_status):
+        return tracer.start_span(span_name, ignore_active_span=ignore_active_span)
 
-    @trace_publishing_status.setter
-    def trace_publishing_status(self, value):
-        if not isinstance(value, bool):
-            raise TypeError('Boolean required')
-        if self._trace_publishing_enabled is not None:
-            raise ValueError('Trace publishing has already been set to {}'.format(self._trace_publishing_enabled))
+    parent_span = tracer.active_span
+    child_span = tracer.start_span(span_name, references=parent_span, ignore_active_span=ignore_active_span)
 
-        self._trace_publishing_enabled = value
+    if parent_span is None or not parent_span.get_baggage_item(ROOT_SPAN_KEY_NAME):
+        child_span.set_baggage_item(ROOT_SPAN_KEY_NAME, span_name)
 
-    @property
-    def component_name(self):
-        return self._component_name is not None and self._component_name
-
-    @component_name.setter
-    def component_name(self, value):
-        if not isinstance(value, str):
-            raise TypeError('String required')
-        if self._component_name is not None:
-            raise ValueError('Component name has already been set to {}'.format(self._component_name))
-
-        self._component_name = value
-
-    @property
-    def active_trace_agent_address(self):
-        return self._active_trace_agent_address is not None and self._active_trace_agent_address
-
-    @active_trace_agent_address.setter
-    def active_trace_agent_address(self, value):
-        if not isinstance(value, str):
-            raise TypeError('String required')
-        if self._active_trace_agent_address is not None:
-            raise ValueError('Active Trace Agent address has already been set to {}'.
-                             format(self._active_trace_agent_address))
-
-        self._active_trace_agent_address = value
-
-    @property
-    def scope_manager(self):
-        return self._scope_manager is not None and self._scope_manager
-
-    @scope_manager.setter
-    def scope_manager(self, value):
-        if self._scope_manager is None:
-            self._scope_manager = value
-
-
-GlobalTracingSupport = _TracingSupport()
-
-
-class NilSpan(Span):
-    """ Span that is not an nil span """
-    def __init__(self):
-        super().__init__(None, None)
-
-    def __str__(self):
-        return 'NilSpan: ' + super().__str__()
-
-
-class NilScope:
-    """ Scope that is not an opentrace scope """
-    def __init__(self):
-        self.span = NilSpan()
-
-    def __enter__(self):
-        pass
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        NilSpan._on_error(self.span, exc_type, exc_val, exc_tb)
-
-    def __str__(self):
-        return 'NilScope'
-
-
-def create_async_span(_span_name, _ignore_active_span=False):
-    return None
-
-    # // Creates a Async Child Span with Follows-From relationship from Parent Span embedded in passed context.
-    # // Should be used only in scenarios when
-    # // a) There is dis-continuation in execution and thus result of Child span does not affect the Parent flow at all
-    # // b) The execution of Child Span is guaranteed to start after the completion of Parent Span
-    # // In case of any confusion, use CreateChildSpan method
-    # // Some situations where this method would be suitable includes Kafka Async RPC call, Propagation of Event across
-    # // a channel etc.
-    # func CreateAsyncSpan(ctx context.Context, taskName string, keyAndValues ...Fields) (opentracing.Span, context.Context) {
-    #     if !GetGlobalLFM().GetLogCorrelationStatus() && !GetGlobalLFM().GetTracePublishingStatus() {
-    #         return opentracing.NoopTracer{}.StartSpan(taskName), ctx
-    #     }
-    #
-    #     var asyncSpan opentracing.Span
-    #     var newCtx context.Context
-    #
-    #     parentSpan := opentracing.SpanFromContext(ctx)
-    #
-    #     // We should always be creating Aysnc span from a Valid parent span. If not, create a Child span instead
-    #     if parentSpan == nil {
-    #         logger.Warn(context.Background(), "Async span must be created with a Valid parent span only")
-    #         asyncSpan, newCtx = opentracing.StartSpanFromContext(ctx, taskName)
-    #     } else {
-    #         // Use Background context as the base for Follows-from case; else new span is getting both Child and FollowsFrom relationship
-    #         asyncSpan, newCtx = opentracing.StartSpanFromContext(context.Background(), taskName, opentracing.FollowsFrom(parentSpan.Context()))
-    #     }
-    #
-    #     if parentSpan == nil || parentSpan.BaggageItem(RootSpanNameKey) == "" {
-    #         asyncSpan.SetBaggageItem(RootSpanNameKey, taskName)
-    #     }
-    #
-    #     EnrichSpan(newCtx, keyAndValues...)
-    #     return asyncSpan, newCtx
-    # }
+    enrich_span(child_span, **kwargs)
+    return child_span
 
 
 def create_child_span(task_name, ignore_active_span=False, **kwargs):
@@ -173,10 +70,6 @@ def create_child_span(task_name, ignore_active_span=False, **kwargs):
         4. Any method which is suspected to be time consuming...
     """
     tracer = global_tracer()
-    # if tracer is None or not (GlobalTracingSupport.log_correlation_status or
-    #                           GlobalTracingSupport.trace_publishing_status):
-    #     # return nop tracer
-    #     return Tracer().start_span(task_name)
 
     parent_span = tracer.active_span
     child_span = tracer.start_span(task_name, child_of=parent_span, ignore_active_span=ignore_active_span)

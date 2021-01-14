@@ -33,6 +33,14 @@ Installation instruction
 
 Release Notes
 -------------
+v2.5.5 (2021-01-xx)
+^^^^^^^^^^^^^^^^^^^
+ - Support kv-store persistence & watching on log features prefixes
+ - Removal of NilScope since OpenTracing API will always provide at least a nop
+   tracer when requested via global_tracer() call.
+ - Moved Tracing Support class to log_controller as that is the proper
+   area in kv-store to watch/control for tracing and log correlation
+
 v2.5.4 (2021-01-11)
 ^^^^^^^^^^^^^^^^^^^
  - Bugfix: Corrected trace-id and scan-id output to log. Should be hex lowercase
