@@ -22,11 +22,11 @@ from jaeger_client.constants import SAMPLER_TYPE_CONST
 
 from pyvoltha_min.adapters.common.kvstore.twisted_etcd_store import TwistedEtcdStore
 from pyvoltha_min.common.structlog_setup import string_to_int
+from pyvoltha_min.common.config.kvstore_prefix import KvStore
 from pyvoltha_min.adapters.log_features import GlobalTracingSupport
 
 GLOBAL_CONFIG_ROOT_NODE = "global"
 DEFAULT_KV_STORE_CONFIG_PATH = "config"
-KV_STORE_DATA_PATH_PREFIX = "service/voltha"
 KV_STORE_PATH_SEPARATOR = "/"
 CONFIG_TYPE = "loglevel"
 FEATURE_TYPE = "logfeatures"
@@ -49,7 +49,7 @@ class LogController:
         self._initialized = False
         self._etcd_host = etcd_host
         self._etcd_port = etcd_port
-        self._etcd_client = TwistedEtcdStore(self._etcd_host, self._etcd_port, KV_STORE_DATA_PATH_PREFIX)
+        self._etcd_client = TwistedEtcdStore(self._etcd_host, self._etcd_port, KvStore.prefix)
         self.global_config_path = self.make_component_path(GLOBAL_CONFIG_ROOT_NODE) + DEFAULT_SUFFIX
 
         self._component_name = config.get('component_name')
@@ -82,8 +82,8 @@ class LogController:
             key = key.decode('utf-8')
 
         return key is not None and \
-               key[:len(KV_STORE_DATA_PATH_PREFIX)] == KV_STORE_DATA_PATH_PREFIX and \
-               key[len(KV_STORE_DATA_PATH_PREFIX)+1:] == self.global_config_path
+               key[:len(KvStore.prefix)] == KvStore.prefix and \
+               key[len(KvStore.prefix)+1:] == self.global_config_path
 
     def is_component_default_path(self, key):
         if isinstance(key, bytes):
@@ -91,8 +91,8 @@ class LogController:
 
         default_path = self.make_config_path(DEFAULT_PACKAGE_NAME)
         return key is not None and \
-               key[:len(KV_STORE_DATA_PATH_PREFIX)] == KV_STORE_DATA_PATH_PREFIX and \
-               key[len(KV_STORE_DATA_PATH_PREFIX)+1:] == default_path
+               key[:len(KvStore.prefix)] == KvStore.prefix and \
+               key[len(KvStore.prefix)+1:] == default_path
 
     def is_feature_path(self, key):
         if isinstance(key, bytes):

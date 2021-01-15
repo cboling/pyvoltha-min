@@ -15,7 +15,7 @@
 #
 # pylint: disable=too-few-public-methods, too-many-arguments, import-error
 
-import os
+#import os
 import re
 import json
 from collections import namedtuple
@@ -26,6 +26,7 @@ from voltha_protos import openolt_pb2
 
 from pyvoltha_min.common.config.config_backend import EtcdStore
 from pyvoltha_min.common.utils.registry import registry
+from pyvoltha_min.common.config.kvstore_prefix import KvStore
 
 # logger
 log = structlog.get_logger()
@@ -216,10 +217,7 @@ class TechProfile:
     pbits = ['0b11111111']
 
     # Tech profile path prefix in kv store
-    if "KV_STORE_DATAPATH_PREFIX" in os.environ:
-        kv_store_prefix = os.environ["KV_STORE_DATAPATH_PREFIX"]
-    else:
-        kv_store_prefix = "service/voltha"
+    kv_store_prefix = KvStore.prefix
     KV_STORE_TECH_PROFILE_PATH_PREFIX = '%s/technology_profiles' % kv_store_prefix
 
     # Tech profile path in kv store

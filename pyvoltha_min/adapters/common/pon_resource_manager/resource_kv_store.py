@@ -18,15 +18,13 @@
 import structlog
 
 from pyvoltha_min.common.config.config_backend import EtcdStore
-
-# KV store uses this prefix to store resource info
-PATH_PREFIX = 'service/voltha/resource_manager/{}'
+from pyvoltha_min.common.config.kvstore_prefix import KvStore
 
 
-class ResourceKvStore(object):
+class ResourceKvStore:
     """Implements apis to store/get/remove resource in backend store."""
 
-    def __init__(self, technology, device_id, backend, host, port):
+    def __init__(self, technology, backend, host, port):
         """
         Create ResourceKvStore object.
 
@@ -34,7 +32,6 @@ class ResourceKvStore(object):
         to create the respective object.
 
         :param technology: PON technology
-        :param device_id: OLT device id
         :param backend: Type of backend storage (etcd or consul)
         :param host: host ip info for backend storage
         :param port: port for the backend storage
@@ -43,16 +40,22 @@ class ResourceKvStore(object):
         # logger
         self._log = structlog.get_logger()
 
-        path = PATH_PREFIX.format(technology)
+        # KV store uses this prefix to store resource info
+        path = ResourceKvStore.path_prefix(technology)
         try:
             if backend == 'etcd':
                 self._kv_store = EtcdStore(host, port, path)
             else:
                 self._log.error('Invalid-backend')
                 raise Exception("Invalid-backend-for-kv-store")
+
         except Exception as e:
-            self._log.exception("exception-in-init")
-            raise Exception(e)
+            self._log.exception("exception-in-init", e=e)
+            raise
+
+    @staticmethod
+    def path_prefix(technology):
+        return KvStore.prefix + '/resource_manager/{}'.format(technology)
 
     def update_to_kv_store(self, path, resource):
         """

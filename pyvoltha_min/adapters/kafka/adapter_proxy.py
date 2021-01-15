@@ -26,12 +26,12 @@ import structlog
 from twisted.internet.defer import inlineCallbacks, returnValue
 from voltha_protos.inter_container_pb2 import InterAdapterHeader, InterAdapterMessage
 
+from pyvoltha_min.adapters.common.kvstore.twisted_etcd_store import TwistedEtcdStore
+from pyvoltha_min.common.config.kvstore_prefix import KvStore
 from .container_proxy import ContainerProxy
 from .endpoint_manager import EndpointManager
-from ..common.kvstore.twisted_etcd_store import TwistedEtcdStore
 
 log = structlog.get_logger()
-KV_STORE_DATA_PATH_PREFIX = "service/voltha"
 
 
 class AdapterProxy(ContainerProxy):     # pylint: disable=too-few-public-methods
@@ -39,7 +39,7 @@ class AdapterProxy(ContainerProxy):     # pylint: disable=too-few-public-methods
         super().__init__(kafka_proxy, adapter_topic, my_listening_topic)
         # KV store's IP Address and PORT
         host, port = kv_store_address.split(':', 1)
-        etcd = TwistedEtcdStore(host, port, KV_STORE_DATA_PATH_PREFIX)
+        etcd = TwistedEtcdStore(host, port, KvStore.prefix)
         self._endpoint_manager = EndpointManager(etcd)
 
     @staticmethod

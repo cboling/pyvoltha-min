@@ -23,13 +23,14 @@ uses a KV store in backend to ensure resiliency of the data.
 import ast
 import json
 import shlex
+from argparse import ArgumentParser, ArgumentError
 
 import structlog
-from argparse import ArgumentParser, ArgumentError
 from bitstring import BitArray
 
 from pyvoltha_min.common.tech_profile.tech_profile import TechProfile
 from .resource_kv_store import ResourceKvStore
+# pylint: disable=too-many-lines
 
 
 # Used to parse extra arguments to OpenOlt adapter from the NBI
@@ -40,7 +41,7 @@ class OltVendorArgumentParser(ArgumentParser):
         raise Exception(message)
 
 
-class PONResourceManager(object):
+class PONResourceManager:
     """Implements APIs to initialize/allocate/release alloc/gemport/onu IDs."""
 
     # Constants to identify resource pool
@@ -146,15 +147,14 @@ class PONResourceManager(object):
 
         try:
             self.technology = technology
-            self.extra_args = extra_args 
+            self.extra_args = extra_args
             self.device_id = device_id
             self.backend = backend
             self.host = host
             self.port = port
             self.olt_model = None
 
-            self._kv_store = ResourceKvStore(technology, device_id, backend,
-                                             host, port)
+            self._kv_store = ResourceKvStore(technology, backend, host, port)
             self.tech_profile = TechProfile(self)
 
             # Below attribute, pon_resource_ranges, should be initialized
@@ -180,8 +180,8 @@ class PONResourceManager(object):
             self.intf_ids = None
 
         except Exception as e:
-            self._log.exception("exception-in-init")
-            raise Exception(e)
+            self._log.exception("exception-in-init", e=e)
+            raise
 
     def init_resource_ranges_from_kv_store(self):
         """
@@ -210,7 +210,8 @@ class PONResourceManager(object):
             if resource_range_config is not None:
                 # update internal ranges from kv ranges. If there are missing
                 # values in the KV profile, continue to use the defaults
-                for key,value in json.loads(resource_range_config): self.pon_resource_ranges[key] = value
+                for key, value in json.loads(resource_range_config):
+                    self.pon_resource_ranges[key] = value
 
                 # initialize optional elements that may not be in the profile
                 if self.pon_resource_ranges[PONResourceManager.UNI_ID_START_IDX] is None:
@@ -342,12 +343,12 @@ class PONResourceManager(object):
         self._log.debug("init-device-resource-pool", technology=self.technology,
                        pon_resource_ranges=self.pon_resource_ranges)
 
-        for i in self.intf_ids:
+        for intf_id in self.intf_ids:
             shared_pool_id = self.pon_resource_ranges[PONResourceManager.ONU_ID_SHARED_IDX]
             if shared_pool_id is not None:
-                i = shared_pool_id
+                intf_id = shared_pool_id
             self.init_resource_id_pool(
-                pon_intf_id=i,
+                pon_intf_id=intf_id,
                 resource_type=PONResourceManager.ONU_ID,
                 start_idx=self.pon_resource_ranges[
                     PONResourceManager.ONU_ID_START_IDX],
@@ -356,12 +357,12 @@ class PONResourceManager(object):
             if shared_pool_id is not None:
                 break
 
-        for i in self.intf_ids:
+        for intf_id in self.intf_ids:
             shared_pool_id = self.pon_resource_ranges[PONResourceManager.ALLOC_ID_SHARED_IDX]
             if shared_pool_id is not None:
-                i = shared_pool_id
+                intf_id = shared_pool_id
             self.init_resource_id_pool(
-                pon_intf_id=i,
+                pon_intf_id=intf_id,
                 resource_type=PONResourceManager.ALLOC_ID,
                 start_idx=self.pon_resource_ranges[
                     PONResourceManager.ALLOC_ID_START_IDX],
@@ -370,12 +371,12 @@ class PONResourceManager(object):
             if shared_pool_id is not None:
                 break
 
-        for i in self.intf_ids:
+        for intf_id in self.intf_ids:
             shared_pool_id = self.pon_resource_ranges[PONResourceManager.GEMPORT_ID_SHARED_IDX]
             if shared_pool_id is not None:
-                i = shared_pool_id
+                intf_id = shared_pool_id
             self.init_resource_id_pool(
-                pon_intf_id=i,
+                pon_intf_id=intf_id,
                 resource_type=PONResourceManager.GEMPORT_ID,
                 start_idx=self.pon_resource_ranges[
                     PONResourceManager.GEMPORT_ID_START_IDX],
@@ -384,12 +385,12 @@ class PONResourceManager(object):
             if shared_pool_id is not None:
                 break
 
-        for i in self.intf_ids:
+        for intf_id in self.intf_ids:
             shared_pool_id = self.pon_resource_ranges[PONResourceManager.FLOW_ID_SHARED_IDX]
             if shared_pool_id is not None:
-                i = shared_pool_id
+                intf_id = shared_pool_id
             self.init_resource_id_pool(
-                pon_intf_id=i,
+                pon_intf_id=intf_id,
                 resource_type=PONResourceManager.FLOW_ID,
                 start_idx=self.pon_resource_ranges[
                     PONResourceManager.FLOW_ID_START_IDX],
@@ -402,45 +403,45 @@ class PONResourceManager(object):
         """
         Clear resource pool of all PON ports.
         """
-        for i in self.intf_ids:
+        for intf_id in self.intf_ids:
             shared_pool_id = self.pon_resource_ranges[PONResourceManager.ONU_ID_SHARED_IDX]
             if shared_pool_id is not None:
-                i = shared_pool_id
+                intf_id = shared_pool_id
             self.clear_resource_id_pool(
-                pon_intf_id=i,
+                pon_intf_id=intf_id,
                 resource_type=PONResourceManager.ONU_ID,
             )
             if shared_pool_id is not None:
                 break
 
-        for i in self.intf_ids:
+        for intf_id in self.intf_ids:
             shared_pool_id = self.pon_resource_ranges[PONResourceManager.ALLOC_ID_SHARED_IDX]
             if shared_pool_id is not None:
-                i = shared_pool_id
+                intf_id = shared_pool_id
             self.clear_resource_id_pool(
-                pon_intf_id=i,
+                pon_intf_id=intf_id,
                 resource_type=PONResourceManager.ALLOC_ID,
             )
             if shared_pool_id is not None:
                 break
 
-        for i in self.intf_ids:
+        for intf_id in self.intf_ids:
             shared_pool_id = self.pon_resource_ranges[PONResourceManager.GEMPORT_ID_SHARED_IDX]
             if shared_pool_id is not None:
-                i = shared_pool_id
+                intf_id = shared_pool_id
             self.clear_resource_id_pool(
-                pon_intf_id=i,
+                pon_intf_id=intf_id,
                 resource_type=PONResourceManager.GEMPORT_ID,
             )
             if shared_pool_id is not None:
                 break
 
-        for i in self.intf_ids:
+        for intf_id in self.intf_ids:
             shared_pool_id = self.pon_resource_ranges[PONResourceManager.FLOW_ID_SHARED_IDX]
             if shared_pool_id is not None:
-                i = shared_pool_id
+                intf_id = shared_pool_id
             self.clear_resource_id_pool(
-                pon_intf_id=i,
+                pon_intf_id=intf_id,
                 resource_type=PONResourceManager.FLOW_ID,
             )
             if shared_pool_id is not None:
@@ -492,7 +493,7 @@ class PONResourceManager(object):
 
         return status
 
-    def assert_resource_limits(self, id, resource_type):
+    def assert_resource_limits(self, index, resource_type):
         """
         Assert the specified id value is in the limit bounds of he requested resource type.
 
@@ -511,7 +512,7 @@ class PONResourceManager(object):
             else PONResourceManager.FLOW_ID_END_IDX if resource_type == PONResourceManager.FLOW_ID \
             else PONResourceManager.UNI_ID_END_IDX if resource_type == PONResourceManager.UNI_ID \
             else None
-        if id < self.pon_resource_ranges[start_idx] or id > self.pon_resource_ranges[end_idx]:
+        if index < self.pon_resource_ranges[start_idx] or index > self.pon_resource_ranges[end_idx]:
             raise ValueError('PON Resource ID out of range')
 
     def get_resource_id(self, pon_intf_id, resource_type, num_of_id=1):
@@ -543,12 +544,10 @@ class PONResourceManager(object):
         try:
             resource = self._get_resource(path)
             if resource is not None and \
-                    (resource_type == PONResourceManager.ONU_ID or
-                     resource_type == PONResourceManager.FLOW_ID):
+                    resource_type in (PONResourceManager.ONU_ID, PONResourceManager.FLOW_ID):
                 result = self._generate_next_id(resource)
-            elif resource is not None and (
-                    resource_type == PONResourceManager.GEMPORT_ID or
-                    resource_type == PONResourceManager.ALLOC_ID):
+            elif resource is not None and \
+                    resource_type in (PONResourceManager.GEMPORT_ID, PONResourceManager.ALLOC_ID):
                 if num_of_id == 1:
                     result = self._generate_next_id(resource)
                 else:
@@ -888,7 +887,7 @@ class PONResourceManager(object):
         """
         Get olt model variant
 
-        :return: type of olt model 
+        :return: type of olt model
         """
         olt_model = None
         if self.extra_args and len(self.extra_args) > 0:
@@ -906,7 +905,8 @@ class PONResourceManager(object):
         self._log.debug('olt-model', olt_model=olt_model)
         return olt_model
 
-    def _generate_next_id(self, resource):
+    @staticmethod
+    def _generate_next_id(resource):
         """
         Generate unique id having OFFSET as start index.
 
@@ -917,7 +917,8 @@ class PONResourceManager(object):
         resource[PONResourceManager.POOL].set(1, pos)
         return pos[0] + resource[PONResourceManager.START_IDX]
 
-    def _release_id(self, resource, unique_id):
+    @staticmethod
+    def _release_id(resource, unique_id):
         """
         Release unique id having OFFSET as start index.
 
@@ -1034,7 +1035,8 @@ class PONResourceManager(object):
 
         return resource
 
-    def _format_resource(self, pon_intf_id, start_idx, end_idx):
+    @staticmethod
+    def _format_resource(pon_intf_id, start_idx, end_idx):
         """
         Format resource as json.
 
