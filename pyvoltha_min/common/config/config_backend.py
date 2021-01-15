@@ -19,6 +19,7 @@ import structlog
 from twisted.internet.defer import inlineCallbacks
 
 from pyvoltha_min.common.utils.asleep import asleep
+from pyvoltha_min.common.utils.tracing import traced_function
 
 
 class EtcdStore:
@@ -90,25 +91,28 @@ class EtcdStore:
         return self._etcd
 
     # Proxy methods for etcd with retry support
+    @traced_function(name='etd-blocking-get')
     def _kv_get(self, *args, **kw):
         return self._retry('GET', *args, **kw)
 
+    @traced_function(name='etd-blocking-put')
     def _kv_put(self, *args, **kw):
         return self._retry('PUT', *args, **kw)
 
+    @traced_function(name='etd-blocking-delete')
     def _kv_delete(self, *args, **kw):
         return self._retry('DELETE', *args, **kw)
 
+    @traced_function(name='etd-blocking-list')
     def _kv_list(self, *args, **kw):
         return self._retry('LIST', *args, **kw)
 
     def _retry(self, operation, *args, **kw):
-
         # etcd data sometimes contains non-utf8 sequences, replace
-        self.log.debug('backend-op',
-                       operation=operation,
-                       args=[codecs.encode(x, 'utf8', 'replace') for x in args],
-                       kw=kw)
+        # self.log.debug('backend-op',
+        #                operation=operation,
+        #                args=[codecs.encode(x, 'utf8', 'replace') for x in args],
+        #                kw=kw)
 
         while 1:
             try:
