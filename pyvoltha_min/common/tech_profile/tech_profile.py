@@ -15,7 +15,6 @@
 #
 # pylint: disable=too-few-public-methods, too-many-arguments, import-error
 
-#import os
 import re
 import json
 from collections import namedtuple
