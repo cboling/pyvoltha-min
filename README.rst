@@ -33,7 +33,15 @@ Installation instruction
 
 Release Notes
 -------------
-v2.5.5 (2021-01-xx)
+v2.5.6 (2021-01-20)
+^^^^^^^^^^^^^^^^^^^
+ - Added kv_store_prefix.py to allow for saving/retrieving kv-store prefix so that
+   multiple voltha stacks can use the same kv-store infrastructure. Use KvStore.prefix
+   instead of hardcoded 'service/voltha'
+ - Fixed PM metric metadata titles to match what is expected by the 'kafka-topic-exporter'.
+   Was using 'Ethernet' and 'PON' and should have been 'ETHERNET_NNI' and 'PON_OLT'
+
+v2.5.5 (2021-01-14)
 ^^^^^^^^^^^^^^^^^^^
  - Support kv-store persistence & watching on log features prefixes
  - Removal of NilScope since OpenTracing API will always provide at least a nop
