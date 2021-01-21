@@ -32,6 +32,10 @@ log = structlog.get_logger()
 
 DEFAULT_TECH_PROFILE_TABLE_ID = 64
 
+XGS_PON = 'XGS-PON'
+GPON = 'GPON'
+EPON = 'EPON'
+
 # Enums used while creating TechProfileInstance
 Direction = Enum('Direction', ['UPSTREAM', 'DOWNSTREAM', 'BIDIRECTIONAL'],
                  start=0)
@@ -63,7 +67,7 @@ class InstanceControl:
                  max_gem_payload_size=DEFAULT_GEM_PAYLOAD_SIZE):
         self.onu = onu
         self.uni = uni
-        self.num_gem_ports = num_gem_ports
+        self._num_gem_ports = num_gem_ports
         self.max_gem_payload_size = max_gem_payload_size
 
 
@@ -530,12 +534,12 @@ class TechProfile:
         tconts = [openolt_pb2.Tcont(direction=TechProfile.get_parameter(
             'direction',
             tech_profile_instance.us_scheduler.direction),
-            alloc_id=tech_profile_instance.us_scheduler.alloc_id,
+            alloc_id=tech_profile_instance.us_scheduler.alloc_id(),
             scheduler=us_scheduler),
             openolt_pb2.Tcont(direction=TechProfile.get_parameter(
                 'direction',
                 tech_profile_instance.ds_scheduler.direction),
-                alloc_id=tech_profile_instance.ds_scheduler.alloc_id,
+                alloc_id=tech_profile_instance.ds_scheduler.alloc_id(),
                 scheduler=ds_scheduler)]
 
         return tconts
@@ -578,6 +582,11 @@ class EponProfile(TechProfile):
                               indent=2)
 
 
+class CustomEncoder(json.JSONEncoder):
+    def default(self, o):
+        return {k: v if not isinstance(v, bool) else str(v) for k, v in vars(o).items() if k[0] != '_'}
+
+
 class TechProfileInstance:
     def __init__(self, subscriber_identifier, tech_profile, resource_mgr, intf_id, tp_path, kv_store):
         if tech_profile is None:
@@ -587,14 +596,14 @@ class TechProfileInstance:
         self.name = tech_profile.name
         self.profile_type = tech_profile.profile_type
         self.version = tech_profile.version
-        self.num_of_gem_ports = tech_profile.num_gem_ports
+        self.num_gem_ports = tech_profile.num_gem_ports
         self.instance_control = tech_profile.instance_control
-        self.num_of_tconts = 1       # This may change in future
+        self._num_of_tconts = 1       # This may change in future
 
         # Get TCONT alloc id(s) using resource manager
         if tech_profile.instance_control.onu == 'multi-instance':
             # Each UNI port gets its own TCONT
-            self.alloc_id = resource_mgr.get_resource_id(intf_id, 'ALLOC_ID', self.num_of_tconts)
+            self._alloc_id = resource_mgr.get_resource_id(intf_id, 'ALLOC_ID', self._num_of_tconts)
 
         else:       # 'single-instance'
             # All service flows referencing this TP instance will share a single TCONT. Search
@@ -604,13 +613,13 @@ class TechProfileInstance:
 
             if existing is None:
                 # No, we are the first UNI on this ONU with this TPID. Get the TCONT now
-                self.alloc_id = resource_mgr.get_resource_id(intf_id, 'ALLOC_ID', self.num_of_tconts)
+                self._alloc_id = resource_mgr.get_resource_id(intf_id, 'ALLOC_ID', self._num_of_tconts)
             else:
                 # Use alloc ID from existing UNI instance
-                self.alloc_id = existing.us_scheduler.alloc_id
+                self._alloc_id = existing.us_scheduler.alloc_id()
 
         # Get GEM Port id(s) using resource manager
-        gem_ports = resource_mgr.get_resource_id(intf_id, 'GEMPORT_ID', self.num_of_gem_ports)
+        gem_ports = resource_mgr.get_resource_id(intf_id, 'GEMPORT_ID', self.num_gem_ports)
 
         if isinstance(gem_ports, int):
             gemport_list = [gem_ports]
@@ -619,14 +628,14 @@ class TechProfileInstance:
         else:
             raise ValueError("invalid GEM Port type")
 
-        self.us_scheduler = TechProfileInstance.IScheduler(self.alloc_id, tech_profile.us_scheduler)
-        self.ds_scheduler = TechProfileInstance.IScheduler(self.alloc_id, tech_profile.ds_scheduler)
+        self.us_scheduler = TechProfileInstance.IScheduler(self._alloc_id, tech_profile.us_scheduler)
+        self.ds_scheduler = TechProfileInstance.IScheduler(self._alloc_id, tech_profile.ds_scheduler)
 
         self.upstream_gem_port_attribute_list = list()
         self.downstream_gem_port_attribute_list = list()
         mcast_gem_port_attribute_list = list()
 
-        for idx in range(self.num_of_gem_ports):
+        for idx in range(self.num_gem_ports):
             # Add upstream GEM Ports
             self.upstream_gem_port_attribute_list.append(
                 TechProfileInstance.IGemPortAttribute(gemport_list[idx],
@@ -653,7 +662,10 @@ class TechProfileInstance:
                 scheduler.direction, scheduler.additional_bw,
                 scheduler.priority,
                 scheduler.weight, scheduler.q_sched_policy)
-            self.alloc_id = alloc_id
+            self._alloc_id = alloc_id
+
+        def alloc_id(self):
+            return self._alloc_id
 
     class IGemPortAttribute(GemPortAttribute):
         def __init__(self, gemport_id, gem_port_attribute):
@@ -669,18 +681,25 @@ class TechProfileInstance:
                 dynamic_access_control_list=gem_port_attribute.dynamic_access_control_list,
                 static_access_control_list=gem_port_attribute.static_access_control_list,
                 multicast_gem_id=gem_port_attribute.multicast_gem_id)
-            self.gemport_id = gemport_id
+            self._gemport_id = gemport_id
+
+        def gemport_id(self):
+            return self._gemport_id
 
     def to_json(self):
-        return json.dumps(self, default=lambda o: o.__dict__,
-                          indent=2)
+        return json.dumps(self, indent=2, cls=CustomEncoder)
+        # return json.dumps(self, default=lambda o: o.__dict__,
+        #                   indent=0, cls=CustomEncoder)
+
+    def alloc_id(self):
+        return self._alloc_id
 
     @staticmethod
     def get_single_instance_tp(tp_path, kv_store):
         """ Gets another TP Instance for an ONU on a different UNI port for the same TP ID"""
         # For example:
-        # tpPath like "service/voltha/technology_profiles/xgspon/64/pon-{0}/onu-{1}/uni-{1}"
-        # is broken into ["service/voltha/technology_profiles/xgspon/64/pon-{0}/onu-{1}", ""]
+        # tpPath like "service/voltha/technology_profiles/XGS-PON/64/pon-{0}/onu-{1}/uni-{1}"
+        # is broken into ["service/voltha/technology_profiles/XGS-PON/64/pon-{0}/onu-{1}", ""]
         try:
             uni_path_slice = re.split('/uni-[0-9]+$', tp_path, maxsplit=2)
             if uni_path_slice is None:
