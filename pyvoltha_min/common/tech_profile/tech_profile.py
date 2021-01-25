@@ -268,7 +268,6 @@ class TechProfile:
         self._kv_store = EtcdStore(
             host, port, TechProfile.
             KV_STORE_TECH_PROFILE_PATH_PREFIX)
-        # self.tech_profile_instance_store = dict()
 
     @property
     def kv_store(self):
@@ -299,55 +298,36 @@ class TechProfile:
                   uni_port_name=uni_port_name, path=path)
         return path
 
-    def create_tech_profile_instance(self, table_id, uni_port_name, intf_id):
-        tech_profile_instance = None
-        try:
-            # Get tech profile from kv store
-            tech_profile = self._get_tech_profile_from_kv_store(table_id)
-            path = self.get_tp_path(table_id, uni_port_name)
+    @staticmethod
+    def _tp_load_hook(d):
+        t_f = ('true', 'false')
+        results = namedtuple('tech_profile_instance',
+                             list(d.keys()))(*list(val if not isinstance(val, str) or val.lower() not in t_f
+                                                   else val.lower() == 'true' for val in d.values()))
+        return results
 
-            if tech_profile is not None:
-                tech_profile = self._get_tech_profile(tech_profile)
-                log.debug("Created-tech-profile-instance-with-values-from-kvstore")
-            else:
-                tech_profile = self._default_tech_profile()
-                log.debug("Created-tech-profile-instance-with-default-values")
-
-            tech_profile_instance = TechProfileInstance(uni_port_name, tech_profile,
-                                                        self.resource_mgr, intf_id,
-                                                        path, self._kv_store)
-            self._add_tech_profile_instance(path,
-                                            tech_profile_instance.to_json())
-        except Exception as e:
-            log.exception("Create-tech-profile-instance-failed", exception=e)
-
-        return tech_profile_instance
-
-    def get_tech_profile_instance(self, table_id, uni_port_name):
+    def load_tech_profile_instance(self, tp_id, uni_port_name, _intf_id):
+        """ Load TechProfileInstance from kv-store """
         # path to fetch tech profile instance json from kv store
-        path = TechProfile.TECH_PROFILE_INSTANCE_PATH.format(
-            self.resource_mgr.technology, table_id, uni_port_name)
-
+        path = TechProfile.TECH_PROFILE_INSTANCE_PATH.format(self.resource_mgr.technology,
+                                                             tp_id, uni_port_name)
         try:
-            tech_profile_instance = self._kv_store[path]
+            tp_json = self._kv_store[path]
             log.debug("Tech-profile-instance-present-in-kvstore", path=path,
-                      tech_profile_instance=tech_profile_instance)
+                      tech_profile_instance=tp_json)
 
-            # Parse JSON into an object with attributes corresponding to dict keys.
-            tech_profile_instance = json.loads(tech_profile_instance,
-                                               object_hook=lambda d:
-                                               namedtuple('tech_profile_instance',
-                                                          list(d.keys()))(*list(d.values())))
-            log.debug("Tech-profile-instance-after-json-to-object-conversion", path=path,
-                      tech_profile_instance=tech_profile_instance)
+            # Parse JSON into an object with attributes corresponding to dict keys
+            # and convert strings with 'True' or 'False' to booleans
+            tp_instance = json.loads(tp_json, object_hook=self._tp_load_hook)
+
+            tech_profile_instance = TechProfileInstance.restore(tp_instance, uni_port_name)
             return tech_profile_instance
 
         except KeyError:
             return None
 
-        except BaseException as e:
-            log.debug("Tech-profile-instance-not-present-in-kvstore",
-                      path=path, tech_profile_instance=None, exception=e)
+        except Exception as e:
+            log.exception('tech-profile-load-error', e=e)
             return None
 
     def delete_tech_profile_instance(self, tp_path):
@@ -361,12 +341,14 @@ class TechProfile:
                       exception=e)
             return False
 
-    def _get_tech_profile_from_kv_store(self, table_id):
+    def load_tech_profile(self, table_id):
         """
-        Get tech profile from kv store.
+        Get tech profile from kv store.  The returned value is a simple
+        dictionary.  It can be used as a parameter to the _create_from_dict()
+        static method to be converted back into an object.
 
         :param table_id: reference to get tech profile
-        :return: tech profile if present in kv store else None
+        :return: (dict) tech profile if present in kv store else None
         """
         # get tech profile from kv store
         path = TechProfile.TECH_PROFILE_PATH.format(self.resource_mgr.technology,
@@ -374,15 +356,23 @@ class TechProfile:
         try:
             tech_profile = self._kv_store[path]
             if tech_profile != '':
-                log.debug("Get-tech-profile-success", tech_profile=tech_profile)
+                log.debug("get-tp-success", tech_profile=tech_profile)
                 return json.loads(tech_profile)
 
         except KeyError as e:
-            log.info("Get-tech-profile-failed", exception=e, path=path)
+            log.debug('tp-not-found', path=path)
+
+        except Exception as e:
+            log.exception('get-tp-failed', exception=e, path=path)
+
         return None
 
     def _default_tech_profile(self):
-        # Default tech profile
+        """
+        A default tech profile is used when a TechProfileInstance needs to be created but
+        the technology profile ID was not found in the kv-store.  It provides a very minimal
+        single-tcont/gem-port service
+        """
         upstream_gem_port_attribute_list = list()
         downstream_gem_port_attribute_list = list()
         for pbit in TechProfile.pbits:
@@ -405,7 +395,15 @@ class TechProfile:
             downstream_gem_port_attribute_list=downstream_gem_port_attribute_list)
 
     @staticmethod
-    def _get_tech_profile(tech_profile):
+    def create(tech_profile):
+        """
+        Create TechProfile() from dictionary object
+
+        This is often use to unmarshal saved JSON from the kv-store for a tech profile.
+        """
+        if not isinstance(tech_profile, dict):
+            raise TypeError('A dictionary was expected, received a {}'.format(type(tech_profile)))
+
         # Tech profile fetched from kv store
         instance_control = tech_profile[TechProfile.INSTANCE_CONTROL]
         instance_control = InstanceControl(
@@ -482,7 +480,7 @@ class TechProfile:
         Add tech profile to kv store.
 
         :param path: path to add tech profile
-        :param tech_profile_instance: tech profile instance need to be added
+        :param tech_profile_instance: (str) tech profile instance JSON need to be added
         """
         try:
             self._kv_store[path] = tech_profile_instance
@@ -531,18 +529,19 @@ class TechProfile:
         if ds_scheduler is None:
             ds_scheduler = TechProfile.get_ds_scheduler(tech_profile_instance)
 
-        tconts = [openolt_pb2.Tcont(direction=TechProfile.get_parameter(
-            'direction',
-            tech_profile_instance.us_scheduler.direction),
-            alloc_id=tech_profile_instance.us_scheduler.alloc_id(),
-            scheduler=us_scheduler),
-            openolt_pb2.Tcont(direction=TechProfile.get_parameter(
-                'direction',
-                tech_profile_instance.ds_scheduler.direction),
-                alloc_id=tech_profile_instance.ds_scheduler.alloc_id(),
-                scheduler=ds_scheduler)]
-
-        return tconts
+        raise Exception('TODO: Should not have downstream TCONTs')
+        # TODO: Deprecate this method if never used.  Note downstream should not have TCONTs associated with it
+        # tconts = [openolt_pb2.Tcont(direction=TechProfile.get_parameter(
+        #     'direction',
+        #     tech_profile_instance.us_scheduler.direction),
+        #     alloc_id=tech_profile_instance.us_scheduler.alloc_id,
+        #     scheduler=us_scheduler),
+        #     openolt_pb2.Tcont(direction=TechProfile.get_parameter(
+        #         'direction',
+        #         tech_profile_instance.ds_scheduler.direction),
+        #         alloc_id=tech_profile_instance.ds_scheduler.alloc_id,
+        #         scheduler=ds_scheduler)]
+        # return tconts
 
     @staticmethod
     def get_parameter(param_type, param_value):     # pylint: disable=too-many-branches
@@ -570,7 +569,8 @@ class TechProfile:
 
 
 class EponProfile(TechProfile):
-    def __init__(self, _resource_mgr):  # pylint: disable=super-init-not-called
+    def __init__(self, resource_mgr):  # pylint: disable=super-init-not-called
+        super().__init__(resource_mgr)
         raise NotImplementedError('TODO: Not yet implemented')
 
     class DefaultTechProfile:
@@ -583,12 +583,23 @@ class EponProfile(TechProfile):
 
 
 class CustomEncoder(json.JSONEncoder):
+    """
+    OpenONU Go adapter JSON unmarshalling is strict and does not accept additional
+    fields.  Those have been moved to attributes starting with _ and this encoder is
+    used to insure that they are not serialized into the KV-Store.
+    """
     def default(self, o):
-        return {k: v if not isinstance(v, bool) else str(v) for k, v in vars(o).items() if k[0] != '_'}
+        return {k: v if not isinstance(v, bool) else str(v) for k, v in vars(o).items()
+                if k[0] != '_'}
 
 
 class TechProfileInstance:
-    def __init__(self, subscriber_identifier, tech_profile, resource_mgr, intf_id, tp_path, kv_store):
+    """
+    A TechProfileInstance is an instance of a particular Technology Profile on
+    a specific interface.  The main difference is that it will have resources (AllocIDs,
+    GEM Port IDs, ...) associated with it.
+    """
+    def __init__(self, subscriber_identifier, tech_profile):
         if tech_profile is None:
             raise ValueError('Technology Profile not provided')
 
@@ -600,11 +611,29 @@ class TechProfileInstance:
         self.instance_control = tech_profile.instance_control
         self._num_of_tconts = 1       # This may change in future
 
+        self.us_scheduler = None
+        self.ds_scheduler = None
+
+        self.upstream_gem_port_attribute_list = list()
+        self.downstream_gem_port_attribute_list = list()
+
+    @staticmethod
+    def create(subscriber_identifier, tech_profile, resource_mgr, intf_id, tp_path, kv_store):
+        """
+        Realize a new instance of a Technology profile on the given interface
+
+        The 'tech_profile' passed to this method is a TechnologyProfile object
+        """
+        # pylint: disable=import-outside-toplevel
+        from pyvoltha_min.adapters.common.pon_resource_manager.resource_manager import PONResourceManager
+
+        tp_instance = TechProfileInstance(subscriber_identifier, tech_profile)
+
         # Get TCONT alloc id(s) using resource manager
         if tech_profile.instance_control.onu == 'multi-instance':
             # Each UNI port gets its own TCONT
-            self._alloc_id = resource_mgr.get_resource_id(intf_id, 'ALLOC_ID', self._num_of_tconts)
-
+            alloc_id = resource_mgr.get_resource_id(intf_id, PONResourceManager.ALLOC_ID,
+                                                    tp_instance._num_of_tconts)
         else:       # 'single-instance'
             # All service flows referencing this TP instance will share a single TCONT. Search
             # any existing UNI ports of this ONU and see if they reference this TP-ID and have
@@ -613,26 +642,49 @@ class TechProfileInstance:
 
             if existing is None:
                 # No, we are the first UNI on this ONU with this TPID. Get the TCONT now
-                self._alloc_id = resource_mgr.get_resource_id(intf_id, 'ALLOC_ID', self._num_of_tconts)
+                alloc_id = resource_mgr.get_resource_id(intf_id, PONResourceManager.ALLOC_ID,
+                                                        tp_instance._num_of_tconts)
             else:
                 # Use alloc ID from existing UNI instance
-                self._alloc_id = existing.us_scheduler.alloc_id()
+                alloc_id = existing.us_scheduler.alloc_id
 
         # Get GEM Port id(s) using resource manager
-        gem_ports = resource_mgr.get_resource_id(intf_id, 'GEMPORT_ID', self.num_gem_ports)
-
+        gem_ports = resource_mgr.get_resource_id(intf_id, PONResourceManager.GEMPORT_ID,
+                                                 tp_instance.num_gem_ports)
         if isinstance(gem_ports, int):
             gemport_list = [gem_ports]
+
         elif isinstance(gem_ports, (list, set, tuple)):
             gemport_list = list(gem_ports)
+
         else:
-            raise ValueError("invalid GEM Port type")
+            raise ValueError("invalid GEM Port type: '{}'".format(type(gem_ports)))
 
-        self.us_scheduler = TechProfileInstance.IScheduler(self._alloc_id, tech_profile.us_scheduler)
-        self.ds_scheduler = TechProfileInstance.IScheduler(self._alloc_id, tech_profile.ds_scheduler)
+        # Assign the allocated resources
+        return tp_instance.assign_resources(tech_profile, alloc_id, gemport_list)
 
-        self.upstream_gem_port_attribute_list = list()
-        self.downstream_gem_port_attribute_list = list()
+    @staticmethod
+    def restore(subscriber_identifier, tech_profile):
+        """
+        Restore (or make a copy) of an existing Technology Profile instance for the given interface
+
+        The 'tech_profile' passed to this method needs to have attributes equivalent to the TechProfile
+        class as well as access to Alloc and GEM Port IDs currently allocated to the instance.
+        """
+        tp_instance = TechProfileInstance(subscriber_identifier, tech_profile)
+
+        alloc_id = tech_profile.us_scheduler.alloc_id
+        gemport_ids = {gem_port.gemport_id for gem_port in tech_profile.upstream_gem_port_attribute_list} | \
+            {gem_port.gemport_id for gem_port in tech_profile.downstream_gem_port_attribute_list}
+
+        # Assign the allocated resources
+        return tp_instance.assign_resources(tech_profile, alloc_id, list(gemport_ids))
+
+    def assign_resources(self, tech_profile, alloc_id, gemport_list):
+        """ Create / restore resource assignment step """
+        self.us_scheduler = TechProfileInstance.IScheduler(alloc_id, tech_profile.us_scheduler)
+        self.ds_scheduler = TechProfileInstance.IScheduler(None, tech_profile.ds_scheduler)
+
         mcast_gem_port_attribute_list = list()
 
         for idx in range(self.num_gem_ports):
@@ -655,6 +707,7 @@ class TechProfileInstance:
 
         # Now fold in any multicast downstream GEM ports at end of DS list
         self.downstream_gem_port_attribute_list.extend(mcast_gem_port_attribute_list)
+        return self
 
     class IScheduler(Scheduler):
         def __init__(self, alloc_id, scheduler):
@@ -662,10 +715,7 @@ class TechProfileInstance:
                 scheduler.direction, scheduler.additional_bw,
                 scheduler.priority,
                 scheduler.weight, scheduler.q_sched_policy)
-            self._alloc_id = alloc_id
-
-        def alloc_id(self):
-            return self._alloc_id
+            self.alloc_id = alloc_id
 
     class IGemPortAttribute(GemPortAttribute):
         def __init__(self, gemport_id, gem_port_attribute):
@@ -681,18 +731,24 @@ class TechProfileInstance:
                 dynamic_access_control_list=gem_port_attribute.dynamic_access_control_list,
                 static_access_control_list=gem_port_attribute.static_access_control_list,
                 multicast_gem_id=gem_port_attribute.multicast_gem_id)
-            self._gemport_id = gemport_id
-
-        def gemport_id(self):
-            return self._gemport_id
+            self.gemport_id = gemport_id
 
     def to_json(self):
         return json.dumps(self, indent=2, cls=CustomEncoder)
-        # return json.dumps(self, default=lambda o: o.__dict__,
-        #                   indent=0, cls=CustomEncoder)
 
+    @property
     def alloc_id(self):
-        return self._alloc_id
+        return self.us_scheduler.alloc_id
+
+    @property
+    def gem_port_ids(self):
+        return {gem_port.gemport_id for gem_port in self.upstream_gem_port_attribute_list} | \
+            {gem_port.gemport_id for gem_port in self.downstream_gem_port_attribute_list}
+
+    @property
+    def mcast_gem_port_ids(self):
+        return {gem_port.gemport_id for gem_port in self.downstream_gem_port_attribute_list
+                if gem_port.is_multicast}
 
     @staticmethod
     def get_single_instance_tp(tp_path, kv_store):
@@ -708,10 +764,11 @@ class TechProfileInstance:
             kv_list = kv_store.list(uni_path_slice[0])
             for data, _metadata in kv_list:
                 try:
-                    return json.loads(data)
+                    tp_dict = json.loads(data)
+                    return TechProfile.create(tp_dict)
 
                 except Exception as e:
-                    log.warn('single-instance-json-failure', e=e, data=data, path=tp_path)
+                    log.warn('single-instance-json-failure', e=e, tech_profile=data, path=tp_path)
 
             return None
 

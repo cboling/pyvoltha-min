@@ -33,6 +33,25 @@ Installation instruction
 
 Release Notes
 -------------
+v2.6.0 (2021-01-25)
+^^^^^^^^^^^^^^^^^^^
+ - Moved TechProfile and ResourceManager string constants to pyvoltha_min files since
+   OpenOLT diverged and places brackets '{}' around various elements.  This is needed
+   by python OLT device adapters to work with the OpenONU-go device adapter
+
+ - Customized TechProfile JSON serialization to only output fields ONU can use and
+   expects.  Previous code was causing un-marshaling error in OpenONU-go device adapter.
+   An additional change is that they 'is_multicast' boolean is expected to be encoded
+   as a string in the JSON output.
+
+ - TechProfileInstance creation (or restore from JSON) is now accomplished through
+   either the create() or restore() static methods.  This allows a bit more explicit
+   control on how the object is used in order to better control lifetime and use
+   within an OLT device adapter.
+
+-  The technology profile changes have been tested against both the Python and Go
+   versions of the v2.6 OpenONU device adapter.
+
 v2.5.6 (2021-01-20)
 ^^^^^^^^^^^^^^^^^^^
  - Added kv_store_prefix.py to allow for saving/retrieving kv-store prefix so that

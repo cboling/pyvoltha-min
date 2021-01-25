@@ -229,8 +229,8 @@ class PONResourceManager:
                                 e=e)
         return False
 
-    def update_range_(self, start_idx, start, end_idx, end, shared_idx = None, shared_pool_id = None,
-                      shared_resource_mgr = None):
+    def update_range_(self, start_idx, start, end_idx, end, shared_idx=None, shared_pool_id=None,
+                      shared_resource_mgr=None):
         if (start is not None) and \
                 (start_idx not in self.pon_resource_ranges or self.pon_resource_ranges[start_idx] < start):
             self.pon_resource_ranges[start_idx] = start
@@ -341,7 +341,7 @@ class PONResourceManager:
         """
 
         self._log.debug("init-device-resource-pool", technology=self.technology,
-                       pon_resource_ranges=self.pon_resource_ranges)
+                        pon_resource_ranges=self.pon_resource_ranges)
 
         for intf_id in self.intf_ids:
             shared_pool_id = self.pon_resource_ranges[PONResourceManager.ONU_ID_SHARED_IDX]
@@ -515,39 +515,35 @@ class PONResourceManager:
         if index < self.pon_resource_ranges[start_idx] or index > self.pon_resource_ranges[end_idx]:
             raise ValueError('PON Resource ID out of range')
 
-    def get_resource_id(self, pon_intf_id, resource_type, num_of_id=1):
+    def get_resource_id(self, intf_id, resource_type, num_of_id=1):
         """
         Create alloc/gemport/onu/flow id for given OLT PON interface.
 
-        :param pon_intf_id: OLT PON interface id
+        :param intf_id: OLT PON interface id
         :param resource_type: String to identify type of resource
         :param num_of_id: required number of ids
+
         :return list/int/None: list, int or None if resource type is
                                alloc_id/gemport_id, onu_id or invalid type
                                respectively
         """
-        result = None
-
-        if num_of_id < 1:
-            self._log.error("invalid-num-of-resources-requested")
-            return result
-
         # delegate to the master instance if sharing enabled across instances
         shared_resource_mgr = self.shared_resource_mgrs[self.shared_idx_by_type[resource_type]]
+
         if shared_resource_mgr is not None and shared_resource_mgr is not self:
-            return shared_resource_mgr.get_resource_id(pon_intf_id, resource_type, num_of_id)
+            return shared_resource_mgr.get_resource_id(intf_id, resource_type, num_of_id)
 
-        path = self._get_path(pon_intf_id, resource_type)
-        if path is None:
-            return result
-
+        result = None
+        path = self._get_path(intf_id, resource_type)
         try:
             resource = self._get_resource(path)
-            if resource is not None and \
-                    resource_type in (PONResourceManager.ONU_ID, PONResourceManager.FLOW_ID):
+            if resource is None:
+                raise ValueError("invalid-resource: '{}".format(path))
+
+            if resource_type in (PONResourceManager.ONU_ID, PONResourceManager.FLOW_ID):
                 result = self._generate_next_id(resource)
-            elif resource is not None and \
-                    resource_type in (PONResourceManager.GEMPORT_ID, PONResourceManager.ALLOC_ID):
+
+            elif resource_type in (PONResourceManager.GEMPORT_ID, PONResourceManager.ALLOC_ID):
                 if num_of_id == 1:
                     result = self._generate_next_id(resource)
                 else:
@@ -555,13 +551,10 @@ class PONResourceManager:
                     while num_of_id > 0:
                         result.append(self._generate_next_id(resource))
                         num_of_id -= 1
-            else:
-                raise Exception("get-resource-failed")
 
-            self._log.debug("Get-" + resource_type + "-success", result=result,
-                            path=path)
             # Update resource in kv store
             self._update_resource(path, resource)
+            self._log.debug("allocated-{}".format(resource_type), result=result)
 
         except Exception as e:
             self._log.exception("Get-" + resource_type + "-id-failed",
@@ -625,7 +618,6 @@ class PONResourceManager:
 
         :return boolean: True if removed else False
         """
-
         # delegate to the master instance if sharing enabled across instances
         shared_resource_mgr = self.shared_resource_mgrs[self.shared_idx_by_type[resource_type]]
         if shared_resource_mgr is not None and shared_resource_mgr is not self:
@@ -656,22 +648,16 @@ class PONResourceManager:
         :param pon_intf_onu_id: reference of PON interface id and onu id
         """
         # initialize pon_intf_onu_id tuple to alloc_ids map
-        alloc_id_path = PONResourceManager.ALLOC_ID_RESOURCE_MAP_PATH.format(
-            self.device_id, str(pon_intf_onu_id)
-        )
+        alloc_id_path = PONResourceManager.ALLOC_ID_RESOURCE_MAP_PATH.format(self.device_id,
+                                                                             str(pon_intf_onu_id))
         alloc_ids = list()
-        self._kv_store.update_to_kv_store(
-            alloc_id_path, json.dumps(alloc_ids)
-        )
-
+        self._kv_store.update_to_kv_store(alloc_id_path,
+                                          json.dumps(alloc_ids))
         # initialize pon_intf_onu_id tuple to gemport_ids map
-        gemport_id_path = PONResourceManager.GEMPORT_ID_RESOURCE_MAP_PATH.format(
-            self.device_id, str(pon_intf_onu_id)
-        )
+        gemport_id_path = PONResourceManager.GEMPORT_ID_RESOURCE_MAP_PATH.format(self.device_id,
+                                                                                 str(pon_intf_onu_id))
         gemport_ids = list()
-        self._kv_store.update_to_kv_store(
-            gemport_id_path, json.dumps(gemport_ids)
-        )
+        self._kv_store.update_to_kv_store(gemport_id_path, json.dumps(gemport_ids))
 
     def remove_resource_map(self, pon_intf_onu_id):
         """
@@ -681,18 +667,16 @@ class PONResourceManager:
         """
         # remove pon_intf_onu_id tuple to alloc_ids map
         try:
-            alloc_id_path = PONResourceManager.ALLOC_ID_RESOURCE_MAP_PATH.format(
-                self.device_id, str(pon_intf_onu_id)
-            )
+            alloc_id_path = PONResourceManager.ALLOC_ID_RESOURCE_MAP_PATH.format(self.device_id,
+                                                                                 str(pon_intf_onu_id))
             self._kv_store.remove_from_kv_store(alloc_id_path)
         except Exception as e:
             self._log.error("error-removing-alloc-id", e=e)
 
         try:
             # remove pon_intf_onu_id tuple to gemport_ids map
-            gemport_id_path = PONResourceManager.GEMPORT_ID_RESOURCE_MAP_PATH.format(
-                self.device_id, str(pon_intf_onu_id)
-            )
+            gemport_id_path = PONResourceManager.GEMPORT_ID_RESOURCE_MAP_PATH.format(self.device_id,
+                                                                                     str(pon_intf_onu_id))
             self._kv_store.remove_from_kv_store(gemport_id_path)
         except Exception as e:
             self._log.error("error-removing-gem-ports", e=e)
@@ -723,12 +707,13 @@ class PONResourceManager:
 
         :return list: List of alloc_ids if available, else None
         """
-        path = PONResourceManager.ALLOC_ID_RESOURCE_MAP_PATH.format(
-            self.device_id,
-            str(pon_intf_onu_id))
+        path = PONResourceManager.ALLOC_ID_RESOURCE_MAP_PATH.format(self.device_id,
+                                                                    str(pon_intf_onu_id))
         value = self._kv_store.get_from_kv_store(path)
+
         if value is not None:
             alloc_id_list = json.loads(value)
+
             if len(alloc_id_list) > 0:
                 return alloc_id_list
 
@@ -742,13 +727,12 @@ class PONResourceManager:
 
         :return list: List of gemport IDs if available, else None
         """
-
-        path = PONResourceManager.GEMPORT_ID_RESOURCE_MAP_PATH.format(
-            self.device_id,
-            str(pon_intf_onu_id))
+        path = PONResourceManager.GEMPORT_ID_RESOURCE_MAP_PATH.format(self.device_id,
+                                                                      str(pon_intf_onu_id))
         value = self._kv_store.get_from_kv_store(path)
         if value is not None:
             gemport_id_list = json.loads(value)
+
             if len(gemport_id_list) > 0:
                 return gemport_id_list
 
@@ -762,15 +746,15 @@ class PONResourceManager:
 
         :return list: List of Flow IDs if available, else None
         """
-
-        path = PONResourceManager.FLOW_ID_RESOURCE_MAP_PATH.format(
-            self.device_id,
-            str(pon_intf_onu_id))
+        path = PONResourceManager.FLOW_ID_RESOURCE_MAP_PATH.format(self.device_id,
+                                                                   str(pon_intf_onu_id))
         value = self._kv_store.get_from_kv_store(path)
+
         if value is not None:
             flow_id_list = json.loads(value)
             if not isinstance(flow_id_list, list):
                 raise ValueError('A list of Flow IDs was expected')
+
             if len(flow_id_list) > 0:
                 return flow_id_list
 
@@ -785,11 +769,9 @@ class PONResourceManager:
 
         :return blob: Flow data blob if available, else None
         """
-
-        path = PONResourceManager.FLOW_ID_INFO_PATH.format(
-            self.device_id,
-            str(pon_intf_onu_id),
-            flow_id)
+        path = PONResourceManager.FLOW_ID_INFO_PATH.format(self.device_id,
+                                                           str(pon_intf_onu_id),
+                                                           flow_id)
         value = self._kv_store.get_from_kv_store(path)
         if value is not None:
             return ast.literal_eval(value)
@@ -804,11 +786,9 @@ class PONResourceManager:
         :param flow_id: Flow Id reference
 
         """
-
-        path = PONResourceManager.FLOW_ID_INFO_PATH.format(
-            self.device_id,
-            str(pon_intf_onu_id),
-            flow_id)
+        path = PONResourceManager.FLOW_ID_INFO_PATH.format(self.device_id,
+                                                           str(pon_intf_onu_id),
+                                                           flow_id)
         self._kv_store.remove_from_kv_store(path)
 
     def update_alloc_ids_for_onu(self, pon_intf_onu_id, alloc_ids):
@@ -818,12 +798,9 @@ class PONResourceManager:
         :param pon_intf_onu_id: reference of PON interface id and onu id
         :param alloc_ids: list of alloc ids
         """
-        path = PONResourceManager.ALLOC_ID_RESOURCE_MAP_PATH.format(
-            self.device_id, str(pon_intf_onu_id)
-        )
-        self._kv_store.update_to_kv_store(
-            path, json.dumps(alloc_ids)
-        )
+        path = PONResourceManager.ALLOC_ID_RESOURCE_MAP_PATH.format(self.device_id,
+                                                                    str(pon_intf_onu_id))
+        self._kv_store.update_to_kv_store(path, json.dumps(alloc_ids))
 
     def update_gemport_ids_for_onu(self, pon_intf_onu_id, gemport_ids):
         """
@@ -832,12 +809,9 @@ class PONResourceManager:
         :param pon_intf_onu_id: reference of PON interface id and onu id
         :param gemport_ids: list of gem port ids
         """
-        path = PONResourceManager.GEMPORT_ID_RESOURCE_MAP_PATH.format(
-            self.device_id, str(pon_intf_onu_id)
-        )
-        self._kv_store.update_to_kv_store(
-            path, json.dumps(gemport_ids)
-        )
+        path = PONResourceManager.GEMPORT_ID_RESOURCE_MAP_PATH.format(self.device_id,
+                                                                      str(pon_intf_onu_id))
+        self._kv_store.update_to_kv_store(path, json.dumps(gemport_ids))
 
     def update_flow_id_for_onu(self, pon_intf_onu_id, flow_id, add=True):
         """
@@ -848,9 +822,8 @@ class PONResourceManager:
         :param add: Boolean flag to indicate whether the flow_id should be
                     added or removed from the list. Defaults to adding the flow.
         """
-        path = PONResourceManager.FLOW_ID_RESOURCE_MAP_PATH.format(
-            self.device_id, str(pon_intf_onu_id)
-        )
+        path = PONResourceManager.FLOW_ID_RESOURCE_MAP_PATH.format(self.device_id,
+                                                                   str(pon_intf_onu_id))
         current_flow_ids = self.get_current_flow_ids_for_onu(pon_intf_onu_id)
         self._log.debug("update-flow-info-before", current_flow_ids=current_flow_ids, path=path)
         if not isinstance(current_flow_ids, list):
@@ -876,10 +849,8 @@ class PONResourceManager:
         :param flow_id: Flow ID
         :param flow_data: Flow data blob
         """
-        path = PONResourceManager.FLOW_ID_INFO_PATH.format(
-            self.device_id, str(pon_intf_onu_id), flow_id
-        )
-
+        path = PONResourceManager.FLOW_ID_INFO_PATH.format(self.device_id,
+                                                           str(pon_intf_onu_id), flow_id)
         if not self._kv_store.update_to_kv_store(path, flow_data):
             self._log.error("flow-info-update-failed", path=path, flow_id=flow_id)
 
@@ -961,8 +932,7 @@ class PONResourceManager:
         :param pon_intf_id: OLT PON interface id
         :return: flow id resource path
         """
-        return PONResourceManager.FLOW_ID_POOL_PATH.format(
-            self.device_id, pon_intf_id)
+        return PONResourceManager.FLOW_ID_POOL_PATH.format(self.device_id, pon_intf_id)
 
     def _get_alloc_id_resource_path(self, pon_intf_id):
         """
@@ -971,8 +941,7 @@ class PONResourceManager:
         :param pon_intf_id: OLT PON interface id
         :return: alloc id resource path
         """
-        return PONResourceManager.ALLOC_ID_POOL_PATH.format(
-            self.device_id, pon_intf_id)
+        return PONResourceManager.ALLOC_ID_POOL_PATH.format(self.device_id, pon_intf_id)
 
     def _get_gemport_id_resource_path(self, pon_intf_id):
         """
@@ -981,8 +950,7 @@ class PONResourceManager:
         :param pon_intf_id: OLT PON interface id
         :return: gemport id resource path
         """
-        return PONResourceManager.GEMPORT_ID_POOL_PATH.format(
-            self.device_id, pon_intf_id)
+        return PONResourceManager.GEMPORT_ID_POOL_PATH.format(self.device_id, pon_intf_id)
 
     def _get_onu_id_resource_path(self, pon_intf_id):
         """
@@ -991,8 +959,7 @@ class PONResourceManager:
         :param pon_intf_id: OLT PON interface id
         :return: onu id resource path
         """
-        return PONResourceManager.ONU_ID_POOL_PATH.format(
-            self.device_id, pon_intf_id)
+        return PONResourceManager.ONU_ID_POOL_PATH.format(self.device_id, pon_intf_id)
 
     def _update_resource(self, path, resource):
         """
@@ -1002,12 +969,9 @@ class PONResourceManager:
         :param resource: resource need to be updated
         :return boolean: True if resource updated in kv store else False
         """
-        resource[PONResourceManager.POOL] = \
-            resource[PONResourceManager.POOL].bin
+        resource[PONResourceManager.POOL] = resource[PONResourceManager.POOL].bin
         result = self._kv_store.update_to_kv_store(path, json.dumps(resource))
-        if result is True:
-            return True
-        return False
+        return result is True
 
     def _get_resource(self, path):
         """
@@ -1030,8 +994,7 @@ class PONResourceManager:
             # resource pool in backend store stored as binary string whereas to
             # access the pool to generate/release IDs it need to be converted
             # as BitArray
-            resource[PONResourceManager.POOL] = \
-                BitArray('0b' + resource[PONResourceManager.POOL])
+            resource[PONResourceManager.POOL] = BitArray('0b' + resource[PONResourceManager.POOL])
 
         return resource
 
