@@ -33,6 +33,19 @@ Installation instruction
 
 Release Notes
 -------------
+v2.6.1 (2021-01-27)
+^^^^^^^^^^^^^^^^^^^
+ - BUGFIX: had parameters in TechProfileInstance restore function swapped.
+
+ - Change PM config frequency from units of 1/10 second to 1 second to match the
+   voltha-lib-go implementation.
+
+ - instance_id field in structured logging is instanceId in Go adapters.  Changing to
+   that so that searching logs in EFK for only VOLTHA related logs can use that field
+   name for all types of adapters (and other VOLTHA components)
+
+ - A few incremental improvements to the tracing support
+
 v2.6.0 (2021-01-25)
 ^^^^^^^^^^^^^^^^^^^
  - Moved TechProfile and ResourceManager string constants to pyvoltha_min files since
