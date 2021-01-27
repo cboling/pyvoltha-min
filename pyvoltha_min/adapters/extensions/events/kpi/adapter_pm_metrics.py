@@ -32,7 +32,7 @@ class AdapterPmMetrics:
     start, and stop statistics collection.
     """
     DEFAULT_FREQUENCY_KEY = 'default-collection-frequency'
-    DEFAULT_COLLECTION_FREQUENCY = 15 * 10      # 1/10ths of a second
+    DEFAULT_COLLECTION_FREQUENCY = 15      # seconds
 
     # If the collection object has a property of the following name, it will be used
     # to retrieve the UTC Collection Timestamp (UTC seconds since epoch). If the collection
