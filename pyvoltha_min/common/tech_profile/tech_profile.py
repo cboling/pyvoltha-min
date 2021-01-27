@@ -664,7 +664,7 @@ class TechProfileInstance:
         return tp_instance.assign_resources(tech_profile, alloc_id, gemport_list)
 
     @staticmethod
-    def restore(subscriber_identifier, tech_profile):
+    def restore(tech_profile, subscriber_identifier):
         """
         Restore (or make a copy) of an existing Technology Profile instance for the given interface
 
