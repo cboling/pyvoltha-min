@@ -117,7 +117,7 @@ def setup_logging(log_config, instance_id, verbosity_adjust=0):
         return event_dict
 
     def add_instance_id(_, __, event_dict):
-        event_dict['instance_id'] = instance_id
+        event_dict['instanceId'] = instance_id
         return event_dict
 
     # Configure standard logging
@@ -177,7 +177,7 @@ def update_logging(instance_id, verbosity_adjust=0):
         return event_dict
 
     def add_instance_id(_, __, event_dict):
-        event_dict['instance_id'] = instance_id
+        event_dict['instanceId'] = instance_id
         return event_dict
 
     logging.root.level = verbosity_adjust
