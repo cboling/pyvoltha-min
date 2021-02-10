@@ -15,6 +15,7 @@
 import codecs
 
 import etcd3
+import time
 import structlog
 from twisted.internet.defer import inlineCallbacks
 
@@ -113,7 +114,8 @@ class EtcdStore:
         #                operation=operation,
         #                args=[codecs.encode(x, 'utf8', 'replace') for x in args],
         #                kw=kw)
-
+        retries = 0
+        start = time.monotonic()
         while 1:
             try:
                 etcd = self._get_etcd()
@@ -137,5 +139,8 @@ class EtcdStore:
                 self.log.exception(e)
                 self._backoff('unknown-error-with-etcd')
             self._redo_etcd_connection()
+            retries += 1
 
+        now = time.monotonic()
+        self.log.info(operation, delta=now-start, retries=retries)
         return result

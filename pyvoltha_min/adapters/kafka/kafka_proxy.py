@@ -13,15 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# pylint: skip-file
-
 import threading
+import copy
+import time
 
 from confluent_kafka import Consumer
 from confluent_kafka import Producer as _kafkaProducer
 from structlog import get_logger
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, returnValue, gatherResults, succeed
+from twisted.internet.defer import TimeoutError as TwistedTimeoutErrorDefer
+from twisted.internet.error import TimeoutError as TwistedTimeoutError
 from twisted.internet.threads import deferToThread
 from zope.interface import implementer
 
@@ -29,10 +31,55 @@ from pyvoltha_min.common.utils.registry import IComponent
 from .event_bus_publisher import EventBusPublisher
 
 log = get_logger()
+UNKNOWN_TOPIC = '<unknown>'
+
+
+class KafkaProxyStatistics:
+    def __init__(self, msg_by_label='messages_by_topic'):
+        self.total_messages = 0
+        self.total_errors = 0
+        self.messages_by_x = {UNKNOWN_TOPIC: 0}   # topic -> count
+        self.msg_by_label = msg_by_label
+
+    def clear(self):
+        self.total_messages = 0
+        self.total_errors = 0
+        self.messages_by_x.keys = dict((k, 0) for k in self.messages_by_x)
+
+    def to_dict(self):
+        return {
+            'total_messages': self.total_messages,
+            'total_errors': self.total_errors,
+            self.msg_by_label: copy.deepcopy(self.messages_by_x)
+        }
+
+
+class KafkaProxyProducerStatistics(KafkaProxyStatistics):
+    def __init__(self, msg_by_label='messages_by_topic'):
+        super().__init__(msg_by_label=msg_by_label)
+        self.total_time = 0
+        self.min_time = None
+        self.max_time = None
+
+    def clear(self):
+        super().clear()
+        self.total_time = 0
+        self.min_time = None
+        self.max_time = None
+
+    def to_dict(self):
+        results = super().to_dict()
+        results['total_time'] = self.total_time
+        results['min_time'] = self.min_time
+        results['max_time'] = self.max_time
+
+        good = self.total_messages - self.total_errors
+        results['avg_time'] = None if good == 0 else self.total_time / good
+        return results
 
 
 @implementer(IComponent)
-class KafkaProxy(object):
+class KafkaProxy:
     """
     This is a singleton proxy kafka class to hide the kafka client details. This
     proxy uses confluent-kafka-python as the kafka client. Since that client is
@@ -70,6 +117,8 @@ class KafkaProxy(object):
         self.topic_consumer_map = {}
         self.topic_callbacks_map = {}
         self.topic_any_map_lock = threading.Lock()
+        self.consumer_stats = KafkaProxyStatistics()
+        self.producer_stats = KafkaProxyProducerStatistics()
         log.debug('initialized', endpoint=kafka_endpoint)
 
     @inlineCallbacks
@@ -83,6 +132,7 @@ class KafkaProxy(object):
         KafkaProxy.faulty = False
         self.stopping = False
         self.alive = True
+
         returnValue(self)
 
     def stop(self):
@@ -123,8 +173,8 @@ class KafkaProxy(object):
                 log.debug('stopping-consumers-kafka-proxy', size=len(self.topic_consumer_map))
 
                 consumer_map, self.topic_consumer_map = self.topic_consumer_map, dict()
-                for _, c in consumer_map.items():
-                    d = deferToThread(c.close)
+                for _, consumer in consumer_map.items():
+                    d = deferToThread(consumer.close)
                     d.addTimeout(0.3, reactor, lambda _: log.error('consumer-timeout'))
                     d.addCallbacks(lambda _: log.debug('consumer-success'),
                                    lambda _: None)
@@ -185,11 +235,14 @@ class KafkaProxy(object):
     @inlineCallbacks
     def _wait_for_messages(self, consumer, topic):
         log.debug('entry', topic=topic)
+
+        if topic not in self.consumer_stats.messages_by_x:
+            self.consumer_stats.messages_by_x[topic] = 0
+
         while True:
             try:
                 msg = yield deferToThread(consumer.poll,
                                           self.consumer_poll_timeout)
-
                 if self.stopping:
                     log.debug("stop-request-received", topic=topic)
                     break
@@ -197,35 +250,45 @@ class KafkaProxy(object):
                 log.debug('rx', topic=topic)
                 if msg is None:
                     continue
+
+                self.consumer_stats.total_messages += 1
                 if msg.error():
                     # This typically is received when there are no more messages
                     # to read from kafka. Ignore.
+                    self.consumer_stats.total_errors += 1
                     continue
 
                 # Invoke callbacks
                 log.debug('invoking callbacks', topic=topic, count=len(self.topic_callbacks_map))
-                for cb in self.topic_callbacks_map[topic]:
-                    yield cb(msg)
+                for callback in self.topic_callbacks_map[topic]:
+                    yield callback(msg)
+
+                self.consumer_stats.messages_by_x[topic] += 1
+
+            except KeyError as e:
+                log.warn("unknown-topic", topic=topic)    # Could be shutting down....
+                self.consumer_stats.messages_by_x[UNKNOWN_TOPIC] += 1
+                return
 
             except Exception as e:
                 log.debug("exception-receiving-msg", topic=topic, e=e)
 
     @inlineCallbacks
-    def subscribe(self, topic, callback, groupId, offset='latest'):
+    def subscribe(self, topic, callback, group_id, offset='latest'):
         """
         subscribe allows a caller to subscribe to a given kafka topic.  This API
         always create a group consumer.
         :param topic - the topic to subscribe to
         :param callback - the callback to invoke whenever a message is received
         on that topic
-        :param groupId - the groupId for this consumer.  In the current
+        :param group_id - the groupId for this consumer.  In the current
         implementation there is a one-to-one mapping between a topic and a
         groupId.  In other words, once a groupId is used for a given topic then
         we won't be able to create another groupId for the same topic.
         :param offset:  the kafka offset from where the consumer will start
         consuming messages
         """
-        log.debug('entry', topic=topic, groupId=groupId)
+        log.debug('entry', topic=topic, groupId=group_id)
         try:
             self.topic_any_map_lock.acquire()
             if topic in self.topic_consumer_map:
@@ -236,19 +299,22 @@ class KafkaProxy(object):
                     self.topic_callbacks_map[topic] = [callback]
                 return
 
+            if topic not in self.consumer_stats.messages_by_x:
+                self.consumer_stats.messages_by_x[topic] = 0
+
             # Create consumer for that topic
-            c = Consumer({
+            consumer = Consumer({
                 'bootstrap.servers': self.kafka_endpoint,
-                'group.id': groupId,
+                'group.id': group_id,
                 'auto.offset.reset': offset
             })
             log.debug('sending-to-thread')
-            yield deferToThread(c.subscribe, [topic])
-            # c.subscribe([topic])
-            self.topic_consumer_map[topic] = c
+            yield deferToThread(consumer.subscribe, [topic])
+            # consumer.subscribe([topic])
+            self.topic_consumer_map[topic] = consumer
             self.topic_callbacks_map[topic] = [callback]
             # Start the consumer
-            reactor.callLater(0, self._wait_for_messages, c, topic)
+            reactor.callLater(0, self._wait_for_messages, consumer, topic)
         except Exception as e:
             log.exception("topic-subscription-error", e=e)
         finally:
@@ -272,8 +338,8 @@ class KafkaProxy(object):
             log.debug("unsubscribing-to-topic", topic=topic)
             if topic in self.topic_callbacks_map:
                 index = 0
-                for cb in self.topic_callbacks_map[topic]:
-                    if cb == callback:
+                for cback in self.topic_callbacks_map[topic]:
+                    if cback == callback:
                         break
                     index += 1
                 if index < len(self.topic_callbacks_map[topic]):
@@ -297,7 +363,7 @@ class KafkaProxy(object):
             log.debug("unsubscribing-to-topic-release-lock", topic=topic)
 
     @inlineCallbacks
-    def send_message(self, topic, msg, key=None, span=None):
+    def send_message(self, topic, msg, key=None, span=None):   # pylint: disable=too-many-branches
         # first check whether we have a kafka producer.
         error = None
         try:
@@ -314,19 +380,52 @@ class KafkaProxy(object):
                 # msgs = [msg]
 
                 if self.kproducer is not None and self.event_bus_publisher and self.faulty is False:
+                    start_time = time.monotonic()
                     d = deferToThread(self.kproducer.produce, topic, msg, key)
-                    yield d
+
+                    def successful(results, start):
+                        # Update statistic at this level
+                        delta = time.monotonic() - start
+                        self.producer_stats.total_time += delta
+
+                        if self.producer_stats.max_time is None or delta > self.producer_stats.max_time:
+                            self.producer_stats.max_time = delta
+
+                        if self.producer_stats.min_time is None or delta < self.producer_stats.min_time:
+                            self.producer_stats.min_time = delta
+
+                        if topic not in self.producer_stats.messages_by_x:
+                            self.producer_stats.messages_by_x[topic] = 0
+                        self.producer_stats.messages_by_x[topic] += 1
+                        self.producer_stats.total_messages += 1
+                        return results
+
+                    def failed(reason):
+                        self.producer_stats.total_errors += 1
+                        return reason
+
+                    yield d.addCallbacks(successful, failed, callbackArgs=[start_time])
                     log.debug('sent-kafka-msg', topic=topic)
+
                     # send a lightweight poll to avoid an exception after 100k messages.
-                    d1 = deferToThread(self.kproducer.poll, 0)
-                    yield d1
+                    # NOTE: changed to periodic flush from a 'poll' after each tx
+                    if self.producer_stats.total_messages % 1000 == 0:
+                        try:
+                            d = deferToThread(self.kproducer.flush, 3)
+                            yield d.addCallbacks(lambda flush_cnt: log.debug('flushed', cnt=flush_cnt),
+                                                 lambda r: log.warn('producer-rx-flush-failed', reason=r))
+                        except Exception as _e:
+                            pass
                 else:
                     return
+
+        except (TwistedTimeoutErrorDefer, TwistedTimeoutError):
+            log.warning('tx-timeout', topic=topic)
 
         except Exception as e:
             self.faulty = True
             self.alive_state_handler.callback(self.alive)
-            error = 'failed to send kafka-msg'
+            error = 'failed-to-send-kafka-msg'
             log.error(error, topic=topic, e=e)
 
             # set the kafka producer to None.  This is needed if the
@@ -352,6 +451,10 @@ class KafkaProxy(object):
                 if error:
                     span.error(error)
                 span.finish()
+
+    def clear_statistics(self):
+        self.producer_stats.clear()
+        self.consumer_stats.clear()
 
     # sending heartbeat message to check the readiness
     def send_heartbeat_message(self, topic, msg):
@@ -406,4 +509,4 @@ class KafkaProxy(object):
 
 # Common method to get the singleton instance of the kafka proxy class
 def get_kafka_proxy():
-    return KafkaProxy._kafka_instance
+    return KafkaProxy._kafka_instance    # pylint: disable=protected-access

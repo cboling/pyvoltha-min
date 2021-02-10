@@ -84,7 +84,8 @@ class CoreProxy(ContainerProxy):
         try:
             res = yield self.invoke(rpc="Register",
                                     adapter=adapter,
-                                    deviceTypes=deviceTypes)
+                                    deviceTypes=deviceTypes,
+                                    timeout=5, retries=2)
             log.info("registration-returned", res=res)
             returnValue(res)
 

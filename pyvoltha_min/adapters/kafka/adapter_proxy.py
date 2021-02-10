@@ -24,6 +24,9 @@ from uuid import uuid4
 import six
 import structlog
 from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.internet.defer import TimeoutError as TwistedTimeoutErrorDefer
+from twisted.internet.error import TimeoutError as TwistedTimeoutError
+
 from voltha_protos.inter_container_pb2 import InterAdapterHeader, InterAdapterMessage
 
 from pyvoltha_min.adapters.common.kvstore.twisted_etcd_store import TwistedEtcdStore
@@ -55,7 +58,7 @@ class AdapterProxy(ContainerProxy):     # pylint: disable=too-few-public-methods
     @inlineCallbacks
     def send_inter_adapter_message(self, msg, msg_type, from_adapter, to_adapter, endpoint,
                                    to_device_id=None, proxy_device_id=None,
-                                   message_id=None):
+                                   message_id=None, response_required=True):
         """
         Sends a message directly to an adapter. This is typically used to send
         proxied messages from one adapter to another.  An initial ACK response
@@ -76,10 +79,10 @@ class AdapterProxy(ContainerProxy):     # pylint: disable=too-few-public-methods
         :param message_id: A unique number for this transaction that the
         adapter may use to correlate a request and an async response.
         """
+        ia_msg = InterAdapterMessage()
         try:
             # Set to_adapter
-            if to_adapter is None:
-                to_adapter = self.remote_topic
+            to_adapter = to_adapter or self.remote_topic
 
             # HACK: If endpoint not provided assume a single replica instance
             if endpoint is None or len(endpoint) == 0:
@@ -96,7 +99,6 @@ class AdapterProxy(ContainerProxy):     # pylint: disable=too-few-public-methods
 
             hdr.timestamp.GetCurrentTime()
 
-            ia_msg = InterAdapterMessage()
             ia_msg.header.CopyFrom(hdr)
             ia_msg.body.Pack(msg)
 
@@ -106,11 +108,15 @@ class AdapterProxy(ContainerProxy):     # pylint: disable=too-few-public-methods
 
             res = yield self.invoke(rpc="process_inter_adapter_message",
                                     to_topic=ia_msg.header.to_topic,
-                                    msg=ia_msg)
+                                    msg=ia_msg, response_required=response_required)
             returnValue(res)
 
+        except (TwistedTimeoutError, TwistedTimeoutErrorDefer):
+            log.warn("request-timeout", msg_type=ia_msg.header.type,
+                     to_topic=ia_msg.header.to_topic)
+
         except Exception as e:
-            log.warn("error-sending-request", e=e)
+            log.warn("error-sending-request", msg_type=ia_msg.header.type, e=e)
 
     @property
     def endpoint_manager(self):

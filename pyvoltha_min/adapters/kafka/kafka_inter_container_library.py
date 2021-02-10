@@ -19,7 +19,7 @@
 import codecs
 from uuid import uuid4
 import json
-
+import time
 import six
 import structlog
 from twisted.internet import reactor
@@ -37,7 +37,7 @@ from voltha_protos.inter_container_pb2 import _INTERADAPTERMESSAGETYPE_TYPES as 
 from pyvoltha_min.common.utils import asleep
 from pyvoltha_min.common.utils.tracing import create_async_span, create_child_span
 from pyvoltha_min.common.utils.registry import IComponent
-from .kafka_proxy import KafkaProxy, get_kafka_proxy
+from .kafka_proxy import KafkaProxy, get_kafka_proxy, KafkaProxyProducerStatistics
 
 
 log = structlog.get_logger()
@@ -57,6 +57,22 @@ class KafkaMessagingError(Exception):
     def __init__(self, error):
         super().__init__()
         self.error = error
+
+
+class InterContainerStatistics(KafkaProxyProducerStatistics):
+    def __init__(self):
+        self.requests = KafkaProxyProducerStatistics(msg_by_label='messages_by_rpc')
+        self.responses = KafkaProxyProducerStatistics(msg_by_label='messages_by_rpc')
+
+    def clear(self):
+        self.requests.clear()
+        self.responses.clear()
+
+    def to_dict(self):
+        return {
+            'requests': self.requests.to_dict(),
+            'responses': self.responses.to_dict(),
+        }
 
 
 @implementer(IComponent)
@@ -93,16 +109,7 @@ class IKafkaMessagingProxy:
         self.received_msg_queue = DeferredQueue()
         self.stopped = False
 
-        self.init_time = 0
-        self.init_received_time = 0
-
-        self.init_resp_time = 0
-        self.init_received_resp_time = 0
-
-        self.num_messages = 0
-        self.total_time = 0
-        self.num_responses = 0
-        self.total_time_responses = 0
+        self.stats = InterContainerStatistics()
         log.debug("KafkaProxy-initialized")
 
     def start(self):
@@ -345,7 +352,7 @@ class IKafkaMessagingProxy:
         return None
 
     @staticmethod
-    def _format_request(rpc, to_topic, reply_topic, **kwargs):
+    def _format_request(rpc, to_topic, reply_topic, response_required, **kwargs):
         """
         Format a request to send over kafka
         :param rpc: Requested remote API
@@ -365,12 +372,11 @@ class IKafkaMessagingProxy:
             request.header.from_topic = reply_topic
             request.header.to_topic = to_topic
 
-            if reply_topic:
+            if reply_topic and response_required:
                 request_body.reply_to_topic = reply_topic
                 request_body.response_required = True
-                response_required = True
             else:
-                response_required = False
+                request_body.response_required = False
 
             request.header.timestamp.GetCurrentTime()
             request_body.rpc = rpc
@@ -385,15 +391,16 @@ class IKafkaMessagingProxy:
                     log.exception("Failed-parsing-value", e=e, key=key)
 
             request.body.Pack(request_body)
-            return request, transaction_id, response_required
+            return request, transaction_id
 
         except Exception as e:
             log.exception("formatting-request-failed",
                           rpc=rpc,
                           to_topic=to_topic,
                           reply_topic=reply_topic,
+                          response_required=response_required,
                           args=kwargs)
-            return None, None, None
+            return None, None
 
     @staticmethod
     def _format_response(msg_header, msg_body, status):
@@ -533,11 +540,12 @@ class IKafkaMessagingProxy:
                                 response = self._format_response(
                                     msg_header=message.header,
                                     msg_body=res,
-                                    status=status,
+                                    status=status
                                 )
                                 if response is not None:
                                     res_topic = self._to_string(response.header.to_topic)
                                     res_span, span = span, None
+
                                     self.send_kafka_message(res_topic, response, res_span)
 
                                 log.debug("Response-sent", to_topic=res_topic)
@@ -577,8 +585,8 @@ class IKafkaMessagingProxy:
             span.finish()
 
     @inlineCallbacks
-    def send_request(self, rpc, to_topic, reply_topic=None,   # pylint: disable=too-many-branches
-                     callback=None, **kwargs):
+    def send_request(self, rpc, to_topic, reply_topic=None,   # pylint: disable=too-many-branches, too-many-locals, too-many-statements
+                     callback=None, response_required=True, **kwargs):
         """
         Invoked to send a message to a remote container and receive a response if required
 
@@ -597,6 +605,7 @@ class IKafkaMessagingProxy:
             returnValue(None)
 
         span = None
+        ident = None
         try:
             # Embed opentrace span
             is_async = not reply_topic
@@ -605,15 +614,18 @@ class IKafkaMessagingProxy:
             if span_arg is not None:
                 kwargs[SPAN_ARG] = span_arg
 
+            start_time = time.monotonic()
+
             # Ensure all strings are not unicode encoded
             rpc = self._to_string(rpc)
             to_topic = self._to_string(to_topic)
             reply_topic = self._to_string(reply_topic)
 
-            request, transaction_id, response_required = self._format_request(rpc=rpc,
-                                                                              to_topic=to_topic,
-                                                                              reply_topic=reply_topic,
-                                                                              **kwargs)
+            request, transaction_id = self._format_request(rpc,
+                                                           to_topic,
+                                                           reply_topic,
+                                                           response_required,
+                                                           **kwargs)
             if request is None:
                 if span is not None:
                     span.error('failed to format request')
@@ -626,44 +638,83 @@ class IKafkaMessagingProxy:
 
             if response_required:
                 wait_for_result = Deferred()
-                self.transaction_id_deferred_map[self._to_string(request.header.id)] = wait_for_result
+                ident = self._to_string(request.header.id)
+                self.transaction_id_deferred_map[ident] = wait_for_result
 
-            log.debug("message-send", transaction_id=transaction_id, to_topic=to_topic,
-                      from_topic=reply_topic, rpc=rpc)
+            log.debug("message-send", transaction_id=transaction_id, to_topic=to_topic, rpc=rpc)
 
             if is_async:
                 async_span, span = span, None
             else:
                 async_span = None
 
-            yield self.send_kafka_message(to_topic, request, async_span)
+            d = self.send_kafka_message(to_topic, request, async_span)
 
-            log.debug("message-sent", transaction_id=transaction_id, to_topic=to_topic,
-                      from_topic=reply_topic, rpc=rpc)
+            def successful(results, rpc_name, start):
+                # Update statistic at this level
+                delta = time.monotonic() - start
+                self.stats.requests.total_time += delta
+
+                if self.stats.requests.max_time is None or delta > self.stats.requests.max_time:
+                    self.stats.requests.max_time = delta
+
+                if self.stats.requests.min_time is None or delta < self.stats.requests.min_time:
+                    self.stats.requests.min_time = delta
+
+                if rpc_name not in self.stats.requests.messages_by_x:
+                    self.stats.requests.messages_by_x[rpc_name] = 0
+
+                self.stats.requests.messages_by_x[rpc_name] += 1
+                self.stats.requests.total_messages += 1
+                return results
+
+            def failed(reason):
+                self.stats.requests.total_errors += 1
+                return reason
+
+            yield d.addCallbacks(successful, failed, callbackArgs=[rpc, start_time])
+
+            log.debug("message-sent", transaction_id=transaction_id, to_topic=to_topic, rpc=rpc)
 
             if response_required:
                 res = yield wait_for_result
 
-                # Remove the transaction from the transaction map
-                del self.transaction_id_deferred_map[transaction_id]
-
                 if res is not None:
+                    # Update statistic at this level
+                    delta = time.monotonic() - start_time
+                    self.stats.responses.total_time += delta
+
+                    if self.stats.responses.max_time is None or delta > self.stats.responses.max_time:
+                        self.stats.responses.max_time = delta
+
+                    if self.stats.responses.min_time is None or delta < self.stats.responses.min_time:
+                        self.stats.responses.min_time = delta
+
+                    if rpc not in self.stats.responses.messages_by_x:
+                        self.stats.responses.messages_by_x[rpc] = 0
+                    self.stats.responses.messages_by_x[rpc] += 1
+                    self.stats.responses.total_messages += 1
+
                     if res.success:
-                        log.debug("send-message-response", transaction_id=transaction_id, rpc=rpc)
+                        log.debug("send-message-response", transaction_id=transaction_id, rpc=rpc,
+                                  to_topic=to_topic, delta_time=delta)
                         if callback:
                             callback((res.success, res.result))
                         else:
                             returnValue((res.success, res.result))
                     else:
                         # this is the case where the core API returns a grpc code.NotFound.  Return or callback
-                        # so the caller can act appropriately (i.e add whatever was not found)
-                        log.info("send-message-response-error-result", transaction_id=transaction_id,
-                                 rpc=rpc, kafka_request=request, kafka_result=res)
+                        # so the caller can act appropriately (i.e add whatever was not found).  Note that
+                        # Not-found is not always an error. An OLT may be looking up a new ONU to see if it
+                        # already exists
+                        log.debug("send-message-response-error-result", transaction_id=transaction_id,
+                                  rpc=rpc, kafka_result=res, to_topic=to_topic, delta_time=delta)
                         if callback:
                             callback((res.success, None))
                         else:
                             returnValue((res.success, None))
                 else:
+                    self.stats.responses.total_errors += 1
                     raise KafkaMessagingError("failed-response-for-request:{}".format(request))
 
         except Exception as e:
@@ -671,6 +722,10 @@ class IKafkaMessagingProxy:
             raise KafkaMessagingError(e) from e
 
         finally:
+            if ident is not None:
+                # Remove the transaction from the transaction map
+                self.transaction_id_deferred_map.pop(ident, None)
+
             if span is not None:
                 span.finish()
 
