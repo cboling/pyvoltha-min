@@ -13,6 +13,7 @@
 # limitations under the License.
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred
+from twisted.internet.base import DelayedCall
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 from twisted.internet.defer import TimeoutError as TwistedTimeoutErrorDefer
 
@@ -49,7 +50,7 @@ class DeferredWithTimeout(Deferred):
     def _cancel_timer(self):
         timer, self._timer = self._timer, None
         try:
-            if not timer.called and not timer.cancelled:
+            if timer is not None and not timer.called and not timer.cancelled:
                 timer.cancel()
                 return
 
