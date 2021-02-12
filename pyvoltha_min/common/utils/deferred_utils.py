@@ -13,7 +13,7 @@
 # limitations under the License.
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred
-from twisted.internet.error import AlreadyCalled
+from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 from twisted.internet.defer import TimeoutError as TwistedTimeoutErrorDefer
 
 
@@ -28,11 +28,11 @@ class DeferredWithTimeout(Deferred):
     def __init__(self, timeout=1.0):
         Deferred.__init__(self)
         self._timeout = timeout
-        self.timer = reactor.callLater(timeout, self.timed_out)
+        self._timer = reactor.callLater(timeout, self.timed_out)
 
     def timed_out(self):
-        self.errback(
-            TwistedTimeoutErrorDefer('timed out after {} seconds'.format(self._timeout)))
+        self.errback(TwistedTimeoutErrorDefer('timed out after {} seconds'.
+                                              format(self._timeout)))
 
     def callback(self, result):
         self._cancel_timer()
@@ -47,7 +47,11 @@ class DeferredWithTimeout(Deferred):
         return Deferred.cancel(self)
 
     def _cancel_timer(self):
+        timer, self._timer = self._timer, None
         try:
-            self.timer.cancel()
-        except AlreadyCalled:
+            if not timer.called and not timer.cancelled:
+                timer.cancel()
+                return
+
+        except (AlreadyCalled, AlreadyCancelled):
             pass
