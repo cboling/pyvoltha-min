@@ -33,6 +33,10 @@ Installation instruction
 
 Release Notes
 -------------
+v2.6.3 (2021-02-12)
+^^^^^^^^^^^^^^^^^^^
+ - Rollback confluent-kafka version
+
 v2.6.2 (2021-02-12)
 ^^^^^^^^^^^^^^^^^^^
  - Added Kafka proxy statistics to help support scaling efforts
