@@ -3,14 +3,14 @@ Twisted         == 20.3.0
 argparse        == 1.4.0
 arrow           == 0.17.0
 bitstring       == 3.1.7
-confluent-kafka == 1.5.0
+confluent-kafka == 1.6.0
 etcd3           == 0.12.0
 netaddr         == 0.8.0
 netifaces       == 0.10.9
 protobuf        == 3.14.0
-structlog       == 20.1.0
+structlog       == 20.2.0
 txaioetcd       == 18.10.2
 voltha-protos   == 4.0.7
 
 # Log correlation
-jaeger-client   == 4.3.0
+jaeger-client   == 4.4.0
