@@ -21,10 +21,12 @@ from twisted.internet.defer import CancelledError, inlineCallbacks, returnValue
 from twisted.python.failure import Failure
 
 DEFAULT_KVSTORE_RETRIES = 0
+DEFAULT_KVSTORE_TIMEOUT = 5
 
 
 class TwistedEtcdStore:
-    def __init__(self, host, port, path_prefix, timeout=None, default_retries=DEFAULT_KVSTORE_RETRIES):
+    def __init__(self, host, port, path_prefix, timeout=DEFAULT_KVSTORE_TIMEOUT,
+                 default_retries=DEFAULT_KVSTORE_RETRIES):
         self._etcd = etcd3.client(host=host, port=port, timeout=timeout)
         self._host = host
         self._port = port
