@@ -33,6 +33,19 @@ Installation instruction
 
 Release Notes
 -------------
+v2.6.2 (2021-02-12)
+^^^^^^^^^^^^^^^^^^^
+ - Added Kafka proxy statistics to help support scaling efforts
+ - Changed producer 'poll' after 'produce' call to a periocic 'flush'
+   to lower outstanding threads that could be blocking on the client.
+ - Modified call parameters to kafka producer send related methods to allow
+   for no response to be expected and to control timeout and retries beyond the
+   default (if a response is requested).
+ - Dropped unused etcd classes (kv_client, kvstore) to minimize number of ways
+   etcd can be used.  Eventually the blocking etcd client used by the Resource
+   manager will be deprecated and removed as well.  Remaining etcd classes consolidated
+   to same directory as others.
+
 v2.6.1 (2021-01-27)
 ^^^^^^^^^^^^^^^^^^^
  - BUGFIX: had parameters in TechProfileInstance restore function swapped.

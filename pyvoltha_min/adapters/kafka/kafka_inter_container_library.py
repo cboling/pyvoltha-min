@@ -59,7 +59,7 @@ class KafkaMessagingError(Exception):
         self.error = error
 
 
-class InterContainerStatistics(KafkaProxyProducerStatistics):
+class InterContainerStatistics:
     def __init__(self):
         self.requests = KafkaProxyProducerStatistics(msg_by_label='messages_by_rpc')
         self.responses = KafkaProxyProducerStatistics(msg_by_label='messages_by_rpc')
@@ -653,8 +653,11 @@ class IKafkaMessagingProxy:
             def successful(results, rpc_name, start):
                 # Update statistic at this level
                 delta = time.monotonic() - start
-                self.stats.requests.total_time += delta
 
+                log.debug("message-sent-callback", transaction_id=transaction_id, to_topic=to_topic,
+                          rpc=rpc, delta=delta, results=results)
+
+                self.stats.requests.total_time += delta
                 if self.stats.requests.max_time is None or delta > self.stats.requests.max_time:
                     self.stats.requests.max_time = delta
 
@@ -695,9 +698,10 @@ class IKafkaMessagingProxy:
                     self.stats.responses.messages_by_x[rpc] += 1
                     self.stats.responses.total_messages += 1
 
+                    # Results is a protobuf with 'success' boolean and 'results' any field
                     if res.success:
-                        log.debug("send-message-response", transaction_id=transaction_id, rpc=rpc,
-                                  to_topic=to_topic, delta_time=delta)
+                        log.debug("send-message-response-ok", transaction_id=transaction_id, rpc=rpc,
+                                  to_topic=to_topic, delta_time=delta, result=res)
                         if callback:
                             callback((res.success, res.result))
                         else:
@@ -707,8 +711,8 @@ class IKafkaMessagingProxy:
                         # so the caller can act appropriately (i.e add whatever was not found).  Note that
                         # Not-found is not always an error. An OLT may be looking up a new ONU to see if it
                         # already exists
-                        log.debug("send-message-response-error-result", transaction_id=transaction_id,
-                                  rpc=rpc, kafka_result=res, to_topic=to_topic, delta_time=delta)
+                        log.debug("send-message-response-no-success", transaction_id=transaction_id,
+                                  rpc=rpc, kafka_result=res, to_topic=to_topic, delta_time=delta, result=res)
                         if callback:
                             callback((res.success, None))
                         else:

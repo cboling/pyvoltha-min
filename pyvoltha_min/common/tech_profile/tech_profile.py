@@ -23,6 +23,7 @@ from enum import Enum
 import structlog
 from voltha_protos import openolt_pb2
 
+#from pyvoltha_min.common.config.twisted_etcd_store import TwistedEtcdStore as EtcdStore
 from pyvoltha_min.common.config.config_backend import EtcdStore
 from pyvoltha_min.common.utils.registry import registry
 from pyvoltha_min.common.config.kvstore_prefix import KvStore
@@ -265,13 +266,8 @@ class TechProfile:
 
         # KV store's IP Address and PORT
         host, port = self.args.kv_store_address.split(':', 1)
-        self._kv_store = EtcdStore(
-            host, port, TechProfile.
-            KV_STORE_TECH_PROFILE_PATH_PREFIX)
+        self._kv_store = EtcdStore(host, port, TechProfile.KV_STORE_TECH_PROFILE_PATH_PREFIX)
 
-    @property
-    def kv_store(self):
-        return self._kv_store
 
     class DefaultTechProfile:
         def __init__(self, name, **kwargs):

@@ -28,6 +28,7 @@ from pyvoltha_min.common.utils.deferred_utils import DeferredWithTimeout
 from pyvoltha_min.common.utils.registry import IComponent
 
 log = structlog.get_logger()
+DEFAULT_CONTAINER_TIMEOUT = 60
 
 
 class KafkaMessagingError(BaseException):
@@ -39,12 +40,12 @@ class KafkaMessagingError(BaseException):
 @implementer(IComponent)
 class ContainerProxy:
 
-    def __init__(self, kafka_proxy, remote_topic, my_listening_topic):
+    def __init__(self, kafka_proxy, remote_topic, my_listening_topic, default_timeout=DEFAULT_CONTAINER_TIMEOUT):
         self.kafka_proxy = kafka_proxy
         self.listening_topic = my_listening_topic
         self.remote_topic = remote_topic
-        self.default_timeout = 60    # VOL-2163 changed this from 10s to 60s for the
-                                     # voltha-lib-go
+        self.default_timeout = default_timeout    # VOL-2163 changed this from 10s to 60s for the voltha-lib-go,
+                                                  # inter-container in OpenONU-go is 30 seconds by default
     def start(self):
         log.info('started')
         return self
@@ -112,20 +113,18 @@ class ContainerProxy:
                                                              callback=None,
                                                              response_required=response,
                                                              **kw)
-                if not m_callback.called:
+                if not m_callback.called and (not hasattr(m_callback, 'cancelled') or not m_callback.cancelled):
                     m_callback.callback(result)
                 else:
-                    log.debug('timeout-already-occurred', rpc=rpc)
+                    log.debug('timeout-or-cancelled', rpc=rpc)
 
             except Exception as _e:
                 log.exception("failure-sending-request", rpc=rpc, kw=kw)
                 if not m_callback.called:
                     m_callback.errback(failure.Failure())
 
-        # We are going to resend the request on the to_topic if there is a
-        # timeout error. This time the timeout will be longer.  If the second
-        # request times out then we will send the request to the default
-        # core_topic.
+        # Default action (timeout=None, retries=0) will try 1 attempt and if a response
+        # is required, the default timeout is used
         attempts = retries + 1
         timeouts = [timeout or self.default_timeout] * attempts
         retry = 0
@@ -133,22 +132,22 @@ class ContainerProxy:
         for response_timeout in timeouts:
             d = DeferredWithTimeout(timeout=response_timeout)
 
-            send_time_1 = time.monotonic()
+            send_time = time.monotonic()
             _send_request(rpc, d, to_topic, reply_topic, response_required, **kwargs)
-            send_time_2 = time.monotonic()
+
             try:
-                res = yield d
-                returnValue(res)
+                results = yield d
+                returnValue(results)
 
             except (TwistedTimeoutError, TwistedTimeoutErrorDefer) as e:
                 now = time.monotonic()
                 if retry >= attempts - 1:
-                    log.warn('invoke-timeout', e=e, retry=retry, attempts=attempts,
-                             delta_1=now - send_time_1, delta_2=now - send_time_2)
+                    log.warn('invoke-timeout', e=e, rpc=rpc, retry=retry, attempts=attempts,
+                             delta=now - send_time)
                     raise e
 
-                log.info('invoke-timeout', e=e, retry=retry, attempts=attempts,
-                         delta_1=now - send_time_1, delta_2=now - send_time_2)
+                log.info('invoke-timeout', e=e, rpc=rpc, retry=retry, attempts=attempts,
+                         delta=now - send_time)
                 retry += 1
 
             except Exception as e:

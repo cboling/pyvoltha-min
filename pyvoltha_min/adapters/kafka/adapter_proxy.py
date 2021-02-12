@@ -28,18 +28,24 @@ from twisted.internet.defer import TimeoutError as TwistedTimeoutErrorDefer
 from twisted.internet.error import TimeoutError as TwistedTimeoutError
 
 from voltha_protos.inter_container_pb2 import InterAdapterHeader, InterAdapterMessage
+from voltha_protos.inter_container_pb2 import Error as InterAdapterError
+from voltha_protos.inter_container_pb2 import ErrorCode as InterAdapterErrorCode
 
-from pyvoltha_min.adapters.common.kvstore.twisted_etcd_store import TwistedEtcdStore
+from pyvoltha_min.common.config.twisted_etcd_store import TwistedEtcdStore
 from pyvoltha_min.common.config.kvstore_prefix import KvStore
 from .container_proxy import ContainerProxy
 from .endpoint_manager import EndpointManager
 
 log = structlog.get_logger()
 
+# OpenONU device adapter has a 30 second default timeout
+DEFAULT_INTERADAPTER_TIMEOUT = 30
+
 
 class AdapterProxy(ContainerProxy):     # pylint: disable=too-few-public-methods
-    def __init__(self, kafka_proxy, adapter_topic, my_listening_topic, kv_store_address):
-        super().__init__(kafka_proxy, adapter_topic, my_listening_topic)
+    def __init__(self, kafka_proxy, adapter_topic, my_listening_topic, kv_store_address,
+                 default_timeout=DEFAULT_INTERADAPTER_TIMEOUT):
+        super().__init__(kafka_proxy, adapter_topic, my_listening_topic, default_timeout=default_timeout)
         # KV store's IP Address and PORT
         host, port = kv_store_address.split(':', 1)
         etcd = TwistedEtcdStore(host, port, KvStore.prefix)
@@ -58,7 +64,7 @@ class AdapterProxy(ContainerProxy):     # pylint: disable=too-few-public-methods
     @inlineCallbacks
     def send_inter_adapter_message(self, msg, msg_type, from_adapter, to_adapter, endpoint,
                                    to_device_id=None, proxy_device_id=None,
-                                   message_id=None, response_required=True):
+                                   message_id=None, response_required=True, timeout=None):
         """
         Sends a message directly to an adapter. This is typically used to send
         proxied messages from one adapter to another.  An initial ACK response
@@ -106,17 +112,25 @@ class AdapterProxy(ContainerProxy):     # pylint: disable=too-few-public-methods
                       from_topic=ia_msg.header.from_topic, to_topic=ia_msg.header.to_topic,
                       to_device_id=ia_msg.header.to_device_id)
 
-            res = yield self.invoke(rpc="process_inter_adapter_message",
-                                    to_topic=ia_msg.header.to_topic,
-                                    msg=ia_msg, response_required=response_required)
-            returnValue(res)
+            results = yield self.invoke(rpc="process_inter_adapter_message",
+                                        to_topic=ia_msg.header.to_topic,
+                                        msg=ia_msg, response_required=response_required,
+                                        timeout=timeout)
+
+            log.debug("sent-inter-adapter-message", type=ia_msg.header.type,
+                      from_topic=ia_msg.header.from_topic, to_topic=ia_msg.header.to_topic,
+                      to_device_id=ia_msg.header.to_device_id, result=results)
+
+            returnValue(results)
 
         except (TwistedTimeoutError, TwistedTimeoutErrorDefer):
-            log.warn("request-timeout", msg_type=ia_msg.header.type,
-                     to_topic=ia_msg.header.to_topic)
-
+            log.info("request-timeout", msg_type=msg_type, to_topic=ia_msg.header.to_topic)
+            returnValue(InterAdapterError(code=InterAdapterErrorCode.DEADLINE_EXCEEDED,
+                                          reason='Local deferred timeout'))
         except Exception as e:
-            log.warn("error-sending-request", msg_type=ia_msg.header.type, e=e)
+            log.warn("error-sending-request", msg_type=msg_type, to_topic=ia_msg.header.to_topic, e=e)
+            returnValue(InterAdapterError(code=InterAdapterErrorCode.UNSUPPORTED_REQUEST,
+                                          reason='exception: {}'.format(e)))
 
     @property
     def endpoint_manager(self):

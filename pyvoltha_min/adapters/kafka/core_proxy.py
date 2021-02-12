@@ -29,39 +29,37 @@ from voltha_protos.voltha_pb2 import CoreInstance
 from .container_proxy import ContainerProxy
 
 log = structlog.get_logger()
+DEFAULT_CORE_CONTAINER_TIMEOUT = 60
 
 
-def createSubTopic(*args):
-    return '_'.join(args)
+class CoreProxy(ContainerProxy):  # pylint: disable=too-many-public-methods
 
-
-class CoreProxy(ContainerProxy):
-
-    def __init__(self, kafka_proxy, default_core_topic, default_event_topic, my_listening_topic):
-        super().__init__(kafka_proxy, default_core_topic, my_listening_topic)
+    def __init__(self, kafka_proxy, default_core_topic, default_event_topic, my_listening_topic,
+                 default_timeout=DEFAULT_CORE_CONTAINER_TIMEOUT):
+        super().__init__(kafka_proxy, default_core_topic, my_listening_topic, default_timeout=default_timeout)
         self.core_default_topic = default_core_topic
         self.event_default_topic = default_event_topic
-        self.deviceId_to_core_map = dict()
+        self.device_id_to_core_map = dict()
 
     def update_device_core_reference(self, device_id, core_topic):
         log.debug("update_device_core_reference")
-        self.deviceId_to_core_map[device_id] = core_topic
+        self.device_id_to_core_map[device_id] = core_topic
 
     def delete_device_core_reference(self, device_id, _core_topic):
         log.debug("delete_device_core_reference")
-        del self.deviceId_to_core_map[device_id]
+        del self.device_id_to_core_map[device_id]
 
     def get_adapter_topic(self, **_kwargs):
         return self.listening_topic
 
     def get_core_topic(self, device_id):
-        if device_id in self.deviceId_to_core_map:
-            return self.deviceId_to_core_map[device_id]
+        if device_id in self.device_id_to_core_map:
+            return self.device_id_to_core_map[device_id]
         return self.core_default_topic
 
     @ContainerProxy.wrap_request(CoreInstance)
     @inlineCallbacks
-    def register(self, adapter, deviceTypes):
+    def register(self, adapter, device_types):
         log.debug("register")
 
         if adapter.totalReplicas == 0 and adapter.currentReplica != 0:
@@ -84,13 +82,13 @@ class CoreProxy(ContainerProxy):
         try:
             res = yield self.invoke(rpc="Register",
                                     adapter=adapter,
-                                    deviceTypes=deviceTypes,
+                                    deviceTypes=device_types,
                                     timeout=5, retries=2)
             log.info("registration-returned", res=res)
             returnValue(res)
 
         except (TwistedTimeoutError, TwistedTimeoutErrorDefer):
-            log.info('register-timeout', adapter=adapter, deviceTypes=deviceTypes)
+            log.info('register-timeout', adapter=adapter, deviceTypes=device_types)
             raise   # Let caller get timeout so it can decide its own retransmission pattern
 
         except Exception as e:
@@ -109,8 +107,6 @@ class CoreProxy(ContainerProxy):
         to_topic = self.get_core_topic(device_id)
         reply_topic = self.get_adapter_topic()
 
-        # to_topic = createSubTopic(self.core_topic, device_id)
-        # reply_topic = createSubTopic(self.listening_topic, device_id)
         res = yield self.invoke(rpc="GetDevice",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
@@ -143,8 +139,6 @@ class CoreProxy(ContainerProxy):
         to_topic = self.get_core_topic(device_id)
         reply_topic = self.get_adapter_topic()
 
-        # to_topic = createSubTopic(self.core_topic, device_id)
-        # reply_topic = createSubTopic(self.listening_topic, device_id)
         res = yield self.invoke(rpc="GetPorts",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
@@ -180,23 +174,26 @@ class CoreProxy(ContainerProxy):
                                 proxy_address=proxy_address)
         returnValue(res)
 
-    def _to_proto(self, **kwargs):
+    @staticmethod
+    def _to_proto(**kwargs):
         encoded = {}
-        for k, v in kwargs.items():
-            if isinstance(v, Message):
-                encoded[k] = v
-            elif type(v) == int:
+        for k, val in kwargs.items():
+            if isinstance(val, Message):
+                encoded[k] = val
+            elif isinstance(val, int):
                 i_proto = IntType()
-                i_proto.val = v
+                i_proto.val = val
                 encoded[k] = i_proto
-            elif type(v) == str:
+            elif isinstance(val, str):
                 s_proto = StrType()
-                s_proto.val = v
+                s_proto.val = val
                 encoded[k] = s_proto
-            elif type(v) == bool:
+            elif isinstance(val, bool):
                 b_proto = BoolType()
-                b_proto.val = v
+                b_proto.val = val
                 encoded[k] = b_proto
+            else:
+                raise TypeError('Unsupported type: {} for key {}'.format(type(val), k))
         return encoded
 
     @ContainerProxy.wrap_request(Device)
@@ -218,8 +215,6 @@ class CoreProxy(ContainerProxy):
         to_topic = self.get_core_topic(parent_device_id)
         reply_topic = self.get_adapter_topic()
 
-        # to_topic = createSubTopic(self.core_topic, parent_device_id)
-        # reply_topic = createSubTopic(self.listening_topic, parent_device_id)
         args = self._to_proto(**kw)
         res = yield self.invoke(rpc="ChildDeviceDetected",
                                 to_topic=to_topic,
@@ -252,8 +247,6 @@ class CoreProxy(ContainerProxy):
         to_topic = self.get_core_topic(device.id)
         reply_topic = self.get_adapter_topic()
 
-        # to_topic = createSubTopic(self.core_topic, device.id)
-        # reply_topic = createSubTopic(self.listening_topic, device.id)
         res = yield self.invoke(rpc="DeviceUpdate",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
@@ -284,8 +277,6 @@ class CoreProxy(ContainerProxy):
         to_topic = self.get_core_topic(device_id)
         reply_topic = self.get_adapter_topic()
 
-        # to_topic = createSubTopic(self.core_topic, device_id)
-        #     reply_topic = createSubTopic(self.listening_topic, device_id)
         res = yield self.invoke(rpc="DeviceStateUpdate",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
@@ -315,8 +306,6 @@ class CoreProxy(ContainerProxy):
         to_topic = self.get_core_topic(device_id)
         reply_topic = self.get_adapter_topic()
 
-        # to_topic = createSubTopic(self.core_topic, device_id)
-        # reply_topic = createSubTopic(self.listening_topic, device_id)
         res = yield self.invoke(rpc="ChildrenStateUpdate",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
@@ -336,8 +325,6 @@ class CoreProxy(ContainerProxy):
         to_topic = self.get_core_topic(parent_device_id)
         reply_topic = self.get_adapter_topic()
 
-        # to_topic = createSubTopic(self.core_topic, device_id)
-        # reply_topic = createSubTopic(self.listening_topic, device_id)
         res = yield self.invoke(rpc="ReconcileChildDevices",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
@@ -353,24 +340,22 @@ class CoreProxy(ContainerProxy):
                           oper_status):
         dev_id = ID()
         dev_id.id = device_id
-        pt = IntType()
-        pt.val = port_type
-        pNo = IntType()
-        pNo.val = port_no
+        ptype = IntType()
+        ptype.val = port_type
+        pnumber = IntType()
+        pnumber.val = port_no
         o_status = IntType()
         o_status.val = oper_status
 
         to_topic = self.get_core_topic(device_id)
         reply_topic = self.get_adapter_topic()
 
-        # to_topic = createSubTopic(self.core_topic, device_id)
-        # reply_topic = createSubTopic(self.listening_topic, device_id)
         res = yield self.invoke(rpc="PortStateUpdate",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
                                 device_id=dev_id,
-                                port_type=pt,
-                                port_no=pNo,
+                                port_type=ptype,
+                                port_no=pnumber,
                                 oper_status=o_status)
         returnValue(res)
 
@@ -396,8 +381,6 @@ class CoreProxy(ContainerProxy):
         to_topic = self.get_core_topic(parent_device_id)
         reply_topic = self.get_adapter_topic()
 
-        # to_topic = createSubTopic(self.core_topic, parent_device_id)
-        # reply_topic = createSubTopic(self.listening_topic, parent_device_id)
         res = yield self.invoke(rpc="child_devices_state_update",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
@@ -413,18 +396,16 @@ class CoreProxy(ContainerProxy):
     @inlineCallbacks
     def device_pm_config_update(self, device_pm_config, init=False):   # TODO: Core does not have the init parameter
         log.debug("device_pm_config_update")
-        b = BoolType()
-        b.val = init
+        is_init = BoolType()
+        is_init.val = init
         to_topic = self.get_core_topic(device_pm_config.id)
         reply_topic = self.get_adapter_topic()
 
-        # to_topic = createSubTopic(self.core_topic, device_pm_config.id)
-        # reply_topic = createSubTopic(self.listening_topic, device_pm_config.id)
         res = yield self.invoke(rpc="DevicePMConfigUpdate",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
                                 device_pm_config=device_pm_config,
-                                init=b)
+                                init=is_init)
         returnValue(res)
 
     @ContainerProxy.wrap_request(None)
@@ -436,8 +417,6 @@ class CoreProxy(ContainerProxy):
         to_topic = self.get_core_topic(device_id)
         reply_topic = self.get_adapter_topic()
 
-        # to_topic = createSubTopic(self.core_topic, device_id)
-        # reply_topic = createSubTopic(self.listening_topic, device_id)
         res = yield self.invoke(rpc="PortCreated",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
@@ -462,8 +441,6 @@ class CoreProxy(ContainerProxy):
         to_topic = self.get_core_topic(device_id)
         reply_topic = self.get_adapter_topic()
 
-        # to_topic = createSubTopic(self.core_topic, device_id)
-        # reply_topic = createSubTopic(self.listening_topic, device_id)
         res = yield self.invoke(rpc="PortsStateUpdate",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
@@ -493,24 +470,23 @@ class CoreProxy(ContainerProxy):
 
     @ContainerProxy.wrap_request(None)
     @inlineCallbacks
-    def send_packet_in(self, device_id, port, packet):
+    def send_packet_in(self, device_id, port, packet, response_required=True):
         log.debug("send_packet_in", device_id=device_id)
         proto_id = ID()
         proto_id.id = device_id
-        p = IntType()
-        p.val = port
+        port_num = IntType()
+        port_num.val = port
         pac = Packet()
         pac.payload = packet
         to_topic = self.get_core_topic(device_id)
         reply_topic = self.get_adapter_topic()
-        # to_topic = createSubTopic(self.core_topic, device_id)
-        # reply_topic = createSubTopic(self.listening_topic, device_id)
         res = yield self.invoke(rpc="PacketIn",
                                 to_topic=to_topic,
                                 reply_topic=reply_topic,
                                 device_id=proto_id,
-                                port=p,
-                                packet=pac)
+                                port=port_num,
+                                packet=pac,
+                                response_required=response_required)
         returnValue(res)
 
     @ContainerProxy.wrap_request(None)
@@ -532,7 +508,7 @@ class CoreProxy(ContainerProxy):
 
     # ~~~~~~~~~~~~~~~~~~~ Handle event submissions ~~~~~~~~~~~~~~~~~~~~~
 
-    def filter_alarm(self, _device_id, _alarm_event):
+    def filter_alarm(self, _device_id, _alarm_event):   # pylint: disable=no-self-use
         '''
         TODO
         alarm filtering functionality is not implemented
