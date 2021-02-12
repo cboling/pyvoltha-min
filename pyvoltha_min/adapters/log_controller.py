@@ -20,7 +20,7 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 from jaeger_client import Config
 from jaeger_client.constants import SAMPLER_TYPE_CONST
 
-from pyvoltha_min.adapters.common.kvstore.twisted_etcd_store import TwistedEtcdStore
+from pyvoltha_min.common.config.twisted_etcd_store import TwistedEtcdStore
 from pyvoltha_min.common.structlog_setup import string_to_int
 from pyvoltha_min.common.config.kvstore_prefix import KvStore
 from pyvoltha_min.adapters.log_features import GlobalTracingSupport
