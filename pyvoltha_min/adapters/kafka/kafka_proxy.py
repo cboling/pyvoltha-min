@@ -14,7 +14,6 @@
 # limitations under the License.
 #
 import threading
-import copy
 import time
 
 from confluent_kafka import Consumer
@@ -34,48 +33,73 @@ log = get_logger()
 UNKNOWN_TOPIC = '<unknown>'
 
 
+class KafkaStatistic:
+    def __init__(self):
+        self.count = 0
+        self.errors = 0
+        self.total_time = 0.0
+        self.min_time = None
+        self.max_time = None
+
+    def clear(self):
+        self.count = 0
+        self.errors = 0
+        self.total_time = 0.0
+        self.min_time = None
+        self.max_time = None
+
+    def to_dict(self):
+        good = self.count - self.errors
+        avg_time = None if good == 0 else round(self.total_time / good, 6)
+
+        return {
+            'count': self.count,
+            'errors': self.errors,
+            'total_time': round(self.total_time, 6) if self.total_time is not None else None,
+            'min': round(self.min_time, 6)if self.min_time is not None else None,
+            'max': round(self.max_time, 6) if self.max_time is not None else None,
+            'avg': avg_time
+        }
+
+    def increment(self, delta, error=False):
+        self.count += 1
+
+        if error:
+            self.errors += 1
+        else:
+            self.total_time += delta
+
+            if self.min_time is None or self.min_time > delta:
+                self.min_time = delta
+
+            if self.max_time is None or self.max_time < delta:
+                self.max_time = delta
+
+
 class KafkaProxyStatistics:
-    def __init__(self, msg_by_label='messages_by_topic'):
-        self.total_messages = 0
-        self.total_errors = 0
-        self.messages_by_x = {UNKNOWN_TOPIC: 0}   # topic -> count
+    def __init__(self, msg_by_label='Topics'):
+        # General statistics
+        self.stats = KafkaStatistic()
+
+        # Per topic/rpc statistics
+        self.messages_by_x = dict()   # topic/rpc -> count
         self.msg_by_label = msg_by_label
 
     def clear(self):
-        self.total_messages = 0
-        self.total_errors = 0
-        self.messages_by_x.keys = dict((k, 0) for k in self.messages_by_x)
+        self.stats.clear()
+        self.messages_by_x = dict()
 
     def to_dict(self):
-        return {
-            'total_messages': self.total_messages,
-            'total_errors': self.total_errors,
-            self.msg_by_label: copy.deepcopy(self.messages_by_x)
-        }
+        stats = self.stats.to_dict()
+        stats[self.msg_by_label] = {key: value.to_dict() for key, value in self.messages_by_x.items()}
+        return stats
 
-
-class KafkaProxyProducerStatistics(KafkaProxyStatistics):
-    def __init__(self, msg_by_label='messages_by_topic'):
-        super().__init__(msg_by_label=msg_by_label)
-        self.total_time = 0
-        self.min_time = None
-        self.max_time = None
-
-    def clear(self):
-        super().clear()
-        self.total_time = 0
-        self.min_time = None
-        self.max_time = None
-
-    def to_dict(self):
-        results = super().to_dict()
-        results['total_time'] = self.total_time
-        results['min_time'] = self.min_time
-        results['max_time'] = self.max_time
-
-        good = self.total_messages - self.total_errors
-        results['avg_time'] = None if good == 0 else self.total_time / good
-        return results
+    def increment(self, delta, topic_or_rpc, error=False):
+        self.stats.increment(delta, error=error)
+        if topic_or_rpc:
+            if topic_or_rpc not in self.messages_by_x:
+                self.messages_by_x[topic_or_rpc] = KafkaStatistic()
+            self.messages_by_x[topic_or_rpc].increment(delta, error=error)
 
 
 @implementer(IComponent)
@@ -117,8 +141,9 @@ class KafkaProxy:
         self.topic_consumer_map = {}
         self.topic_callbacks_map = {}
         self.topic_any_map_lock = threading.Lock()
-        self.consumer_stats = KafkaProxyStatistics()
-        self.producer_stats = KafkaProxyProducerStatistics()
+        self.consumer_stats = None                  # First 'clear' of stats enables them
+        self.producer_stats = None
+        self.count = 0
         log.debug('initialized', endpoint=kafka_endpoint)
 
     @inlineCallbacks
@@ -236,9 +261,6 @@ class KafkaProxy:
     def _wait_for_messages(self, consumer, topic):
         log.debug('entry', topic=topic)
 
-        if topic not in self.consumer_stats.messages_by_x:
-            self.consumer_stats.messages_by_x[topic] = 0
-
         while True:
             try:
                 msg = yield deferToThread(consumer.poll,
@@ -251,23 +273,31 @@ class KafkaProxy:
                 if msg is None:
                     continue
 
-                self.consumer_stats.total_messages += 1
                 if msg.error():
                     # This typically is received when there are no more messages
                     # to read from kafka. Ignore.
-                    self.consumer_stats.total_errors += 1
                     continue
 
                 # Invoke callbacks
+                start_time = time.monotonic()
+                dl = []
+
                 log.debug('invoking callbacks', topic=topic, count=len(self.topic_callbacks_map))
                 for callback in self.topic_callbacks_map[topic]:
-                    yield callback(msg)
+                    dl.append(callback(msg))
+                    yield dl[-1]
 
-                self.consumer_stats.messages_by_x[topic] += 1
+                if self.consumer_stats:
+                    def done(_, start):
+                        self.consumer_stats.increment(time.monotonic() - start, topic)
 
-            except KeyError as e:
+                    if dl:
+                        gatherResults(dl, consumeErrors=True).addBoth(done, start_time)
+
+            except KeyError as _e:
                 log.warn("unknown-topic", topic=topic)    # Could be shutting down....
-                self.consumer_stats.messages_by_x[UNKNOWN_TOPIC] += 1
+                if self.consumer_stats:
+                    self.consumer_stats.increment(0, UNKNOWN_TOPIC, error=True)
                 return
 
             except Exception as e:
@@ -298,9 +328,6 @@ class KafkaProxy:
                 else:
                     self.topic_callbacks_map[topic] = [callback]
                 return
-
-            if topic not in self.consumer_stats.messages_by_x:
-                self.consumer_stats.messages_by_x[topic] = 0
 
             # Create consumer for that topic
             consumer = Consumer({
@@ -377,39 +404,29 @@ class KafkaProxy:
                         return
 
                 log.debug('sending-kafka-msg', topic=topic)
-                # msgs = [msg]
-
                 if self.kproducer is not None and self.event_bus_publisher and self.faulty is False:
                     start_time = time.monotonic()
                     d = deferToThread(self.kproducer.produce, topic, msg, key)
 
-                    def successful(results, start):
-                        # Update statistic at this level
-                        delta = time.monotonic() - start
-                        self.producer_stats.total_time += delta
+                    if self.producer_stats:
+                        def successful(results, start):
+                            # Update statistic at this level
+                            self.producer_stats.increment(time.monotonic() - start, topic)
+                            return results
 
-                        if self.producer_stats.max_time is None or delta > self.producer_stats.max_time:
-                            self.producer_stats.max_time = delta
+                        def failed(reason):
+                            self.producer_stats.increment(0, topic, error=True)
+                            return reason
 
-                        if self.producer_stats.min_time is None or delta < self.producer_stats.min_time:
-                            self.producer_stats.min_time = delta
+                        d.addCallbacks(successful, failed, callbackArgs=[start_time])
 
-                        if topic not in self.producer_stats.messages_by_x:
-                            self.producer_stats.messages_by_x[topic] = 0
-                        self.producer_stats.messages_by_x[topic] += 1
-                        self.producer_stats.total_messages += 1
-                        return results
-
-                    def failed(reason):
-                        self.producer_stats.total_errors += 1
-                        return reason
-
-                    yield d.addCallbacks(successful, failed, callbackArgs=[start_time])
+                    yield d
                     log.debug('sent-kafka-msg', topic=topic)
 
                     # send a lightweight poll to avoid an exception after 100k messages.
                     # NOTE: changed to periodic flush from a 'poll' after each tx
-                    if self.producer_stats.total_messages % 1000 == 0:
+                    self.count += 1
+                    if self.count % 1000 == 0:
                         try:
                             d = deferToThread(self.kproducer.flush, 3)
                             yield d.addCallbacks(lambda flush_cnt: log.debug('flushed', cnt=flush_cnt),
@@ -451,10 +468,6 @@ class KafkaProxy:
                 if error:
                     span.error(error)
                 span.finish()
-
-    def clear_statistics(self):
-        self.producer_stats.clear()
-        self.consumer_stats.clear()
 
     # sending heartbeat message to check the readiness
     def send_heartbeat_message(self, topic, msg):

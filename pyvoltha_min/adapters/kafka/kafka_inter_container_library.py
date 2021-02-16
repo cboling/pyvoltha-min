@@ -37,7 +37,7 @@ from voltha_protos.inter_container_pb2 import _INTERADAPTERMESSAGETYPE_TYPES as 
 from pyvoltha_min.common.utils import asleep
 from pyvoltha_min.common.utils.tracing import create_async_span, create_child_span
 from pyvoltha_min.common.utils.registry import IComponent
-from .kafka_proxy import KafkaProxy, get_kafka_proxy, KafkaProxyProducerStatistics
+from .kafka_proxy import KafkaProxy, get_kafka_proxy, KafkaProxyStatistics
 
 
 log = structlog.get_logger()
@@ -61,8 +61,8 @@ class KafkaMessagingError(Exception):
 
 class InterContainerStatistics:
     def __init__(self):
-        self.requests = KafkaProxyProducerStatistics(msg_by_label='messages_by_rpc')
-        self.responses = KafkaProxyProducerStatistics(msg_by_label='messages_by_rpc')
+        self.requests = KafkaProxyStatistics(msg_by_label='RPCs')
+        self.responses = KafkaProxyStatistics(msg_by_label='RPCs')
 
     def clear(self):
         self.requests.clear()
@@ -109,7 +109,8 @@ class IKafkaMessagingProxy:
         self.received_msg_queue = DeferredQueue()
         self.stopped = False
 
-        self.stats = InterContainerStatistics()
+        self.tx_stats = None                # First 'clear' of stats enables them
+        self.rx_stats = None
         log.debug("KafkaProxy-initialized")
 
     def start(self):
@@ -336,7 +337,8 @@ class IKafkaMessagingProxy:
             try:
                 message = yield self.received_msg_queue.get()
                 if not self.stopped:
-                    reactor.callLater(0, self._handle_message, message)
+                    start_time = time.monotonic()
+                    reactor.callLater(0, self._handle_message, message, start_time)
 
             except Exception as e:
                 log.exception("Failed-dequeueing-received-message", e=e)
@@ -452,7 +454,7 @@ class IKafkaMessagingProxy:
             return None
 
     @inlineCallbacks
-    def _handle_message(self, msg):     # pylint: disable=too-many-locals, too-many-branches
+    def _handle_message(self, msg, start_time):     # pylint: disable=too-many-locals, too-many-branches
         """
         Default internal method invoked for every batch of messages received
         from Kafka.
@@ -519,22 +521,26 @@ class IKafkaMessagingProxy:
 
                         # Augment the request arguments with the from_topic
                         augmented_args = _augment_args_with_from_topic(msg_body.args,
-                                                                      msg_body.reply_to_topic)
+                                                                       msg_body.reply_to_topic)
                         try:
+                            rpc = msg_body.rpc
+                            rpc_str = self._to_string(rpc)
+
                             if augmented_args:
-                                log.debug("message-body-args-present", rpc=msg_body.rpc,
+                                log.debug("message-body-args-present", rpc=rpc_str,
                                           response_required=msg_body.response_required,
                                           reply_to_topic=msg_body.reply_to_topic)
-                                (status, res) = yield getattr(
-                                    self.topic_target_cls_map[targetted_topic],
-                                    self._to_string(msg_body.rpc))(**_to_dict(augmented_args))
+
+                                (status, res) = yield getattr(self.topic_target_cls_map[targetted_topic],
+                                                              rpc_str)(**_to_dict(augmented_args))
                             else:
-                                log.debug("message-body-args-absent", rpc=msg_body.rpc,
+                                log.debug("message-body-args-absent", rpc=rpc_str,
                                           response_required=msg_body.response_required,
-                                          reply_to_topic=msg_body.reply_to_topic,)
-                                (status, res) = yield getattr(
-                                    self.topic_target_cls_map[targetted_topic],
-                                    self._to_string(msg_body.rpc))()
+                                          reply_to_topic=msg_body.reply_to_topic)
+                                (status, res) = yield getattr(self.topic_target_cls_map[targetted_topic],
+                                                              rpc_str)()
+                            if self.rx_stats:
+                                self.rx_stats.requests.increment(time.monotonic() - start_time, rpc_str)
 
                             if msg_body.response_required:
                                 response = self._format_response(
@@ -548,7 +554,12 @@ class IKafkaMessagingProxy:
 
                                     self.send_kafka_message(res_topic, response, res_span)
 
-                                log.debug("Response-sent", to_topic=res_topic)
+                                    if self.rx_stats:
+                                        self.rx_stats.responses.increment(time.monotonic() - start_time, rpc_str)
+                                    log.debug("response-sent", to_topic=res_topic, rpc=rpc_str,
+                                              delta=time.monotonic()-start_time)
+                                else:
+                                    log.debug("no-response", rpc=rpc_str, delta=time.monotonic()-start_time)
 
                         except Exception as _e:
                             # TODO: set error in span
@@ -650,32 +661,23 @@ class IKafkaMessagingProxy:
 
             d = self.send_kafka_message(to_topic, request, async_span)
 
-            def successful(results, rpc_name, start):
-                # Update statistic at this level
-                delta = time.monotonic() - start
+            if self.tx_stats:
+                def successful(results, rpc_name, start):
+                    # Update statistic at this level
+                    delta = time.monotonic() - start
 
-                log.debug("message-sent-callback", transaction_id=transaction_id, to_topic=to_topic,
-                          rpc=rpc, delta=delta, results=results)
+                    log.debug("message-sent-callback", transaction_id=transaction_id, to_topic=to_topic,
+                              rpc=rpc, delta=delta, results=results)
+                    self.tx_stats.requests.increment(delta, rpc_name)
+                    return results
 
-                self.stats.requests.total_time += delta
-                if self.stats.requests.max_time is None or delta > self.stats.requests.max_time:
-                    self.stats.requests.max_time = delta
+                def failed(reason, rpc_name):
+                    self.tx_stats.requests.increment(0, rpc_name, error=True)
+                    return reason
 
-                if self.stats.requests.min_time is None or delta < self.stats.requests.min_time:
-                    self.stats.requests.min_time = delta
-
-                if rpc_name not in self.stats.requests.messages_by_x:
-                    self.stats.requests.messages_by_x[rpc_name] = 0
-
-                self.stats.requests.messages_by_x[rpc_name] += 1
-                self.stats.requests.total_messages += 1
-                return results
-
-            def failed(reason):
-                self.stats.requests.total_errors += 1
-                return reason
-
-            yield d.addCallbacks(successful, failed, callbackArgs=[rpc, start_time])
+                d.addCallbacks(successful, failed, callbackArgs=[rpc, start_time],
+                               errbackArgs=[rpc])
+            yield d
 
             log.debug("message-sent", transaction_id=transaction_id, to_topic=to_topic, rpc=rpc)
 
@@ -685,20 +687,10 @@ class IKafkaMessagingProxy:
                 if res is not None:
                     # Update statistic at this level
                     delta = time.monotonic() - start_time
-                    self.stats.responses.total_time += delta
+                    if self.tx_stats:
+                        self.tx_stats.responses.increment(delta, rpc)
 
-                    if self.stats.responses.max_time is None or delta > self.stats.responses.max_time:
-                        self.stats.responses.max_time = delta
-
-                    if self.stats.responses.min_time is None or delta < self.stats.responses.min_time:
-                        self.stats.responses.min_time = delta
-
-                    if rpc not in self.stats.responses.messages_by_x:
-                        self.stats.responses.messages_by_x[rpc] = 0
-                    self.stats.responses.messages_by_x[rpc] += 1
-                    self.stats.responses.total_messages += 1
-
-                    # Results is a protobuf with 'success' boolean and 'results' any field
+                    # Results is a protobuf with 'success' boolean and 'results' ANY field
                     if res.success:
                         log.debug("send-message-response-ok", transaction_id=transaction_id, rpc=rpc,
                                   to_topic=to_topic, delta_time=delta, result=res)
@@ -718,7 +710,9 @@ class IKafkaMessagingProxy:
                         else:
                             returnValue((res.success, None))
                 else:
-                    self.stats.responses.total_errors += 1
+                    if self.tx_stats:
+                        self.tx_stats.responses.increment(0, rpc, error=True)
+
                     raise KafkaMessagingError("failed-response-for-request:{}".format(request))
 
         except Exception as e:
