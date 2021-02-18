@@ -508,12 +508,10 @@ class IKafkaMessagingProxy:
 
                 # Extract opentrace span from the message
                 with self.enrich_context_with_span(msg_body.rpc, msg_body.args) as scope:
-                    log.debug('rx-span')
+                    # log.debug('rx-span')
                     span = scope.span if scope is not None else None
 
                     if targetted_topic in self.topic_target_cls_map:
-
-                        # TODO: If transaction ID in v2.6 required, support here
                         # // let the callee unpack the arguments as its the only one that knows the real proto type
                         # // Augment the requestBody with the message Id as it will be used in scenarios where cores
                         # // are set in pairs and competing
@@ -803,11 +801,11 @@ class IKafkaMessagingProxy:
 
                     span_dict = json.loads(text_map_string.val)
                     span_ctx = tracer.extract(Format.TEXT_MAP, span_dict)
+                    if span_ctx is not None:
+                        rx_rpc_name = span_ctx.baggage.get('rpc-span-name')
+                        return tracer.start_active_span(rx_rpc_name, child_of=span_ctx,
+                                                        finish_on_close=False)
 
-                    rx_rpc_name = span_ctx.baggage.get('rpc-span-name')
-
-                    return tracer.start_active_span(rx_rpc_name, child_of=span_ctx,
-                                                    finish_on_close=False)
         except Exception as e:
             log.info('exception-during-context-decode', err=str(e))
 

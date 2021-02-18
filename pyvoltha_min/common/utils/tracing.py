@@ -263,7 +263,7 @@ def traced_function(func=None, name=None, on_start=None, ignore_active_span=Fals
 
         tracer = global_tracer()
         if async_result:
-            reference_span =follows_from(parent_span.context) if parent_span is not None else None
+            reference_span = follows_from(parent_span.context) if parent_span is not None else None
             parent_span = None
         else:
             reference_span = None

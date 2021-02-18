@@ -33,6 +33,12 @@ Installation instruction
 
 Release Notes
 -------------
+v2.6.4 (2021-02-18)
+^^^^^^^^^^^^^^^^^^^
+ - Rounding kafka stats to microseconds for better readability
+ - Made kafka-stats more generic to allow per topic/rpc-name totals and averages
+ - Optimized kafka RCP encode/decode wrt Tracing if it is not enabled
+
 v2.6.3 (2021-02-12)
 ^^^^^^^^^^^^^^^^^^^
  - Rollback confluent-kafka version
