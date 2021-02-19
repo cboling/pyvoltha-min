@@ -23,8 +23,8 @@ import time
 import six
 import structlog
 from twisted.internet import reactor
-from twisted.internet.defer import inlineCallbacks, returnValue, Deferred, \
-    DeferredQueue, succeed
+from twisted.internet.defer import inlineCallbacks, returnValue, Deferred, DeferredQueue, succeed
+from twisted.internet.defer import TimeoutError as TwistedTimeoutError
 
 from zope.interface import implementer
 
@@ -35,10 +35,11 @@ from voltha_protos.inter_container_pb2 import MessageType, Argument, \
 from voltha_protos.inter_container_pb2 import _INTERADAPTERMESSAGETYPE_TYPES as IA_MSG_ENUM
 
 from pyvoltha_min.common.utils import asleep
+from pyvoltha_min.common.utils.deferred_utils import DeferredWithTimeout
+
 from pyvoltha_min.common.utils.tracing import create_async_span, create_child_span
 from pyvoltha_min.common.utils.registry import IComponent
 from .kafka_proxy import KafkaProxy, get_kafka_proxy, KafkaProxyStatistics
-
 
 log = structlog.get_logger()
 
@@ -50,7 +51,28 @@ MESSAGE_KEY = 'msg'
 PROCESS_IA_MSG_RPC = 'process_inter_adapter_message'
 ROOT_SPAN_NAME_KEY = 'op-name'
 
-# TODO: Look at rw-core transaction ID implications to this library
+
+class KafkaWaitForResponse(DeferredWithTimeout):
+    def __init__(self, ident, rpc, timeout=60):
+        super().__init__(timeout=timeout)
+        self.ident = ident
+        self.rpc = rpc
+        self.created = time.gmtime()
+
+    def cancel(self):
+        if not self.called:
+            try:
+                super().cancel()
+            except Exception as _e:
+                pass
+
+    def to_dict(self):
+        return {
+            'ident': self.ident,
+            'rpc': self.rpc,
+            'created-utc': time.asctime(self.created),
+            'timeout': self._timeout
+        }
 
 
 class KafkaMessagingError(Exception):
@@ -105,7 +127,7 @@ class IKafkaMessagingProxy:
         self.topic_callback_map = {}
         self.subscribers = {}
         self.kafka_proxy = None
-        self.transaction_id_deferred_map = {}
+        self.transaction_id_deferred_map = {}      # Ident -> KafkaWaitForResponse
         self.received_msg_queue = DeferredQueue()
         self.stopped = False
 
@@ -570,9 +592,11 @@ class IKafkaMessagingProxy:
             elif message.header.type == MessageType.Value("RESPONSE"):
                 trns_id = self._to_string(message.header.id)
                 log.debug('received-response', transaction_id=trns_id)
-                if trns_id in self.transaction_id_deferred_map:
+
+                wait_for_response = self.transaction_id_deferred_map.pop(trns_id, None)
+                if wait_for_response:
                     resp = self._parse_response(val)
-                    self.transaction_id_deferred_map[trns_id].callback(resp)
+                    wait_for_response.callback(resp)
             else:
                 log.error("INVALID-TRANSACTION-TYPE")
 
@@ -646,8 +670,8 @@ class IKafkaMessagingProxy:
             wait_for_result = None
 
             if response_required:
-                wait_for_result = Deferred()
                 ident = self._to_string(request.header.id)
+                wait_for_result = KafkaWaitForResponse(ident, rpc)
                 self.transaction_id_deferred_map[ident] = wait_for_result
 
             log.debug("message-send", transaction_id=transaction_id, to_topic=to_topic, rpc=rpc)
@@ -676,50 +700,56 @@ class IKafkaMessagingProxy:
                 d.addCallbacks(successful, failed, callbackArgs=[rpc, start_time],
                                errbackArgs=[rpc])
             yield d
-
             log.debug("message-sent", transaction_id=transaction_id, to_topic=to_topic, rpc=rpc)
 
             if response_required:
-                res = yield wait_for_result
+                response = yield wait_for_result
 
-                if res is not None:
+                if isinstance(response, InterContainerResponseBody):
                     # Update statistic at this level
                     delta = time.monotonic() - start_time
                     if self.tx_stats:
                         self.tx_stats.responses.increment(delta, rpc)
 
                     # Results is a protobuf with 'success' boolean and 'results' ANY field
-                    if res.success:
-                        log.debug("send-message-response-ok", transaction_id=transaction_id, rpc=rpc,
-                                  to_topic=to_topic, delta_time=delta, result=res)
+                    if response.success:
+                        log.debug("response-ok", transaction_id=transaction_id, rpc=rpc,
+                                  to_topic=to_topic, delta_time=delta, response=response)
                         if callback:
-                            callback((res.success, res.result))
+                            callback((response.success, response.result))
                         else:
-                            returnValue((res.success, res.result))
+                            returnValue((response.success, response.result))
                     else:
                         # this is the case where the core API returns a grpc code.NotFound.  Return or callback
                         # so the caller can act appropriately (i.e add whatever was not found).  Note that
                         # Not-found is not always an error. An OLT may be looking up a new ONU to see if it
                         # already exists
-                        log.debug("send-message-response-no-success", transaction_id=transaction_id,
-                                  rpc=rpc, kafka_result=res, to_topic=to_topic, delta_time=delta, result=res)
+                        log.debug("response-no-success", transaction_id=transaction_id, rpc=rpc,
+                                  response=response, to_topic=to_topic, delta_time=delta)
                         if callback:
-                            callback((res.success, None))
+                            callback((response.success, None))
                         else:
-                            returnValue((res.success, None))
+                            returnValue((response.success, None))
                 else:
-                    if self.tx_stats:
-                        self.tx_stats.responses.increment(0, rpc, error=True)
-
-                    raise KafkaMessagingError("failed-response-for-request:{}".format(request))
+                    raise KafkaMessagingError("failed-response: rpc: {}, response {}".format(rpc,
+                                                                                             response))
+        except TwistedTimeoutError as e:
+            log.info("response-timeout", e=e, rpc=rpc)   # Initial 'Register' often times out
+            if self.tx_stats:
+                self.tx_stats.responses.increment(0, rpc, error=True)
+            raise
 
         except Exception as e:
-            log.exception("Exception-sending-request", e=e)
+            log.exception("Exception-sending-request", e=e, rpc=rpc)
+            if self.tx_stats:
+                self.tx_stats.responses.increment(0, rpc, error=True)
             raise KafkaMessagingError(e) from e
 
         finally:
             if ident is not None:
-                # Remove the transaction from the transaction map
+                # Remove the transaction from the transaction map. In normal processing, this
+                # inline callback is invoked from the _handle_message which should have removed
+                # the request from the transaction ID map
                 self.transaction_id_deferred_map.pop(ident, None)
 
             if span is not None:

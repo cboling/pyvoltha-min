@@ -33,6 +33,12 @@ Installation instruction
 
 Release Notes
 -------------
+v2.6.5 (2021-02-19)
+^^^^^^^^^^^^^^^^^^^
+ - Added timeout for intercontainer response (60 seconds) to help insure that the response
+   transaction ID map does not grow unbounded. Future release will provide ability to customize
+   this timeout on a per proxy (core/adapter topic) basis
+
 v2.6.4 (2021-02-18)
 ^^^^^^^^^^^^^^^^^^^
  - Rounding kafka stats to microseconds for better readability

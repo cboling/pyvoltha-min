@@ -118,6 +118,11 @@ class ContainerProxy:
                 else:
                     log.debug('timeout-or-cancelled', rpc=rpc)
 
+            except (TwistedTimeoutError, TwistedTimeoutErrorDefer):
+                log.info("request-timeout", rpc=rpc, kw=kw)
+                if not m_callback.called:
+                    m_callback.errback(failure.Failure())
+
             except Exception as _e:
                 log.exception("failure-sending-request", rpc=rpc, kw=kw)
                 if not m_callback.called:

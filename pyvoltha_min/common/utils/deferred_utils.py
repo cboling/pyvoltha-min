@@ -13,7 +13,6 @@
 # limitations under the License.
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred
-from twisted.internet.base import DelayedCall
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 from twisted.internet.defer import TimeoutError as TwistedTimeoutErrorDefer
 
