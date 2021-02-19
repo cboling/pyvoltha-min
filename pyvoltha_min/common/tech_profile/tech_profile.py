@@ -750,8 +750,8 @@ class TechProfileInstance:
     def get_single_instance_tp(tp_path, kv_store):
         """ Gets another TP Instance for an ONU on a different UNI port for the same TP ID"""
         # For example:
-        # tpPath like "service/voltha/technology_profiles/XGS-PON/64/pon-{0}/onu-{1}/uni-{1}"
-        # is broken into ["service/voltha/technology_profiles/XGS-PON/64/pon-{0}/onu-{1}", ""]
+        # tpPath like "service/voltha_voltha/technology_profiles/XGS-PON/64/pon-{0}/onu-{1}/uni-{1}"
+        # is broken into ["service/voltha_voltha/technology_profiles/XGS-PON/64/pon-{0}/onu-{1}", ""]
         try:
             uni_path_slice = re.split('/uni-[0-9]+$', tp_path, maxsplit=2)
             if uni_path_slice is None:

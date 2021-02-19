@@ -14,7 +14,7 @@
 #
 import os
 
-KV_STORE_PREFIX_DEFAULT = 'service/voltha'
+KV_STORE_PREFIX_DEFAULT = 'service/voltha_voltha'
 
 
 class KvStore:      # pylint: disable=too-few-public-methods
