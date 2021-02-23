@@ -21,8 +21,8 @@ PACKAGE_DIR     := $(WORKING_DIR)pyvoltha_min
 VENVDIR			:= venv-pyvoltha-min
 TESTVENVDIR		:= ${VENVDIR}-test
 VENV_BIN		?= virtualenv
-#VENV_OPTS		?= --python=python3.6 -v
 VENV_OPTS		?= --python=python3.8 -v
+#VENV_OPTS		?= --python=python3.9 -v
 COVERAGE_OPTS	= --with-xcoverage --with-xunit --cover-package=pyvoltha-min\
                   --cover-html --cover-html-dir=tmp/cover
 PYLINT_OUT		= $(WORKING_DIR)pylint.out

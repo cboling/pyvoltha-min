@@ -33,7 +33,7 @@ Installation instruction
 
 Release Notes
 -------------
-v2.7.0 (2021-02-xx)
+v2.7.0 (2021-02-23)
 ^^^^^^^^^^^^^^^^^^^
  - Updated to latest voltha-protos (4.0.13), protobuf (3.15.0), structlog (21.1.0),
    and PyYAML (5.4.1). Update of confluent-kafka to latest is planned after moving
