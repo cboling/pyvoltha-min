@@ -31,7 +31,7 @@ from voltha_protos.inter_container_pb2 import InterAdapterHeader, InterAdapterMe
 from voltha_protos.inter_container_pb2 import Error as InterAdapterError
 from voltha_protos.inter_container_pb2 import ErrorCode as InterAdapterErrorCode
 
-from pyvoltha_min.common.config.twisted_etcd_store import TwistedEtcdStore
+from pyvoltha_min.common.config.twisted_etcd_store import TwistedEtcdStore, DEFAULT_KVSTORE_TIMEOUT
 from pyvoltha_min.common.config.kvstore_prefix import KvStore
 from .container_proxy import ContainerProxy
 from .endpoint_manager import EndpointManager
@@ -44,11 +44,11 @@ DEFAULT_INTERADAPTER_TIMEOUT = 30
 
 class AdapterProxy(ContainerProxy):     # pylint: disable=too-few-public-methods
     def __init__(self, kafka_proxy, adapter_topic, my_listening_topic, kv_store_address,
-                 default_timeout=DEFAULT_INTERADAPTER_TIMEOUT):
+                 default_timeout=DEFAULT_INTERADAPTER_TIMEOUT, kv_store_timeout=DEFAULT_KVSTORE_TIMEOUT):
         super().__init__(kafka_proxy, adapter_topic, my_listening_topic, default_timeout=default_timeout)
         # KV store's IP Address and PORT
         host, port = kv_store_address.split(':', 1)
-        etcd = TwistedEtcdStore(host, port, KvStore.prefix)
+        etcd = TwistedEtcdStore(host, port, KvStore.prefix, timeout=kv_store_timeout)
         self._endpoint_manager = EndpointManager(etcd)
 
     @staticmethod

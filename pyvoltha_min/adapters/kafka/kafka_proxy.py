@@ -343,7 +343,7 @@ class KafkaProxy:
             # Start the consumer
             reactor.callLater(0, self._wait_for_messages, consumer, topic)
         except Exception as e:
-            log.exception("topic-subscription-error", e=e)
+            log.exception("topic-subscription-error", e=e, topic=topic, group_id=group_id)
         finally:
             self.topic_any_map_lock.release()
 

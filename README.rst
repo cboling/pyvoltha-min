@@ -33,9 +33,19 @@ Installation instruction
 
 Release Notes
 -------------
+v2.7.0 (2021-02-xx)
+^^^^^^^^^^^^^^^^^^^
+ - Updated to latest voltha-protos (4.0.13), protobuf (3.15.0), structlog (21.1.0),
+   and PyYAML (5.4.1). Update of confluent-kafka to latest is planned after moving
+   python version to 3.9 in order to pick up newer libraries but no date has been
+   made for that yet.
+ - Changed default kvstore prefix from service/voltha to service/voltha_voltha to match
+   new multi-VOLTHA stack syntax for v2.7
+ - Support passing of optional kv-store timeout to various components that use the kv-store
+
 v2.6.5 (2021-02-19)
 ^^^^^^^^^^^^^^^^^^^
- - Added timeout for intercontainer response (60 seconds) to help insure that the response
+ - Added timeout for inter-container response (60 seconds) to help insure that the response
    transaction ID map does not grow unbounded. Future release will provide ability to customize
    this timeout on a per proxy (core/adapter topic) basis
 

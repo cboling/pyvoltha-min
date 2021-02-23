@@ -20,7 +20,7 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 from jaeger_client import Config
 from jaeger_client.constants import SAMPLER_TYPE_CONST
 
-from pyvoltha_min.common.config.twisted_etcd_store import TwistedEtcdStore
+from pyvoltha_min.common.config.twisted_etcd_store import TwistedEtcdStore, DEFAULT_KVSTORE_TIMEOUT
 from pyvoltha_min.common.structlog_setup import string_to_int
 from pyvoltha_min.common.config.kvstore_prefix import KvStore
 from pyvoltha_min.adapters.log_features import GlobalTracingSupport
@@ -44,12 +44,13 @@ class LogController:
     instance_id = None
     active_log_level = None
 
-    def __init__(self, etcd_host, etcd_port, scope_manager, config, watch_callback=None):
+    def __init__(self, etcd_host, etcd_port, scope_manager, config, watch_callback=None,
+                 kv_store_timeout=DEFAULT_KVSTORE_TIMEOUT):
         self.log = structlog.get_logger()
         self._initialized = False
         self._etcd_host = etcd_host
         self._etcd_port = etcd_port
-        self._etcd_client = TwistedEtcdStore(self._etcd_host, self._etcd_port, KvStore.prefix)
+        self._etcd_client = TwistedEtcdStore(self._etcd_host, self._etcd_port, KvStore.prefix, timeout=kv_store_timeout)
         self.global_config_path = self.make_component_path(GLOBAL_CONFIG_ROOT_NODE) + DEFAULT_SUFFIX
 
         self._component_name = config.get('component_name')
