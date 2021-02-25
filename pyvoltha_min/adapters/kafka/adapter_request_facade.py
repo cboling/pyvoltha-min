@@ -254,52 +254,52 @@ class AdapterRequestFacade:             # pylint: disable=too-many-public-method
 
         return True, self.adapter.revert_image_update(device, request)
 
-    def enable_port(self, device_id, port, **_kwargs):
-        if not device_id:
+    def enable_port(self, deviceId, port, **_kwargs):       # pylint: disable=invalid-name
+        if not deviceId:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
                                 reason="device-id")
         if not port:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
                                 reason="port-invalid")
         str_arg = StrType()
-        device_id.Unpack(str_arg)
+        deviceId.Unpack(str_arg)
         port_arg = Port()
         port.Unpack(port_arg)
 
         return True, self.adapter.enable_port(str_arg.val, port_arg.port_no)
 
-    def disable_port(self, device_id, port, **_kwargs):
-        if not device_id:
+    def disable_port(self, deviceId, port, **_kwargs):       # pylint: disable=invalid-name
+        if not deviceId:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
                                 reason="device-id")
         if not port:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
                                 reason="port-invalid")
         str_arg = StrType()
-        device_id.Unpack(str_arg)
+        deviceId.Unpack(str_arg)
         port_arg = Port()
         port.Unpack(port_arg)
 
         return True, self.adapter.disable_port(str_arg.val, port_arg.port_no)
 
-    def child_device_lost(self, device_id, port_no_arg, onu_id, **_kwargs):
-        if not device_id:
+    def child_device_lost(self, pDeviceId, pPortNo, onuID, **_kwargs):       # pylint: disable=invalid-name
+        if not pDeviceId:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
                                 reason="device-id")
-        if not port_no_arg:
+        if not pPortNo:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
-                                reason="port-number")
-        if not onu_id:
+                                reason="p-port-no")
+        if not onuID:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
                                 reason="onu-id")
         str_arg = StrType()
-        device_id.Unpack(str_arg)
+        pDeviceId.Unpack(str_arg)
 
         port_no = IntType()
-        port_no_arg.Unpack(port_no)
+        pPortNo.Unpack(port_no)
 
         oid = IntType()
-        onu_id.Unpack(oid)
+        onuID.Unpack(oid)
 
         return True, self.adapter.child_device_lost(str_arg.val, port_no.val, oid.val)
 
@@ -386,17 +386,17 @@ class AdapterRequestFacade:             # pylint: disable=too-many-public-method
         log.debug('rx-message', message=ia_msg, from_topic=from_topic)
         return True, self.adapter.process_inter_adapter_message(ia_msg, from_topic=from_topic.val)
 
-    def receive_packet_out(self, device_id, out_port, packet, **_kwargs):
+    def receive_packet_out(self, deviceId, outPort, packet, **_kwargs):       # pylint: disable=invalid-name
         try:
             d_id = StrType()
-            if device_id:
-                device_id.Unpack(d_id)
+            if deviceId:
+                deviceId.Unpack(d_id)
             else:
                 return False, Error(code=ErrorCode.INVALID_PARAMETERS,
                                     reason="device-id-invalid")
             port_number = IntType()
-            if out_port:
-                out_port.Unpack(port_number)
+            if outPort:
+                outPort.Unpack(port_number)
             else:
                 return False, Error(code=ErrorCode.INVALID_PARAMETERS,
                                     reason="outport-invalid")
@@ -431,10 +431,10 @@ class AdapterRequestFacade:             # pylint: disable=too-many-public-method
 
         return True, self.adapter.simulate_alarm(dev, req)
 
-    def get_ext_value(self, device_id, device, value_flag, **_kwargs):
-        if device_id:
+    def get_ext_value(self, deviceId, device, value_flag, **_kwargs):       # pylint: disable=invalid-name
+        if deviceId:
             str_arg = StrType()
-            device_id.Unpack(str_arg)
+            deviceId.Unpack(str_arg)
         else:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
                                 reason="device-id")
