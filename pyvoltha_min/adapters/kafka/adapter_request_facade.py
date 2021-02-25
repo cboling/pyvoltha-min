@@ -20,33 +20,36 @@ formatting and forwards the request to the concrete handler.
 """
 import structlog
 from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.internet.defer import TimeoutError as TwistedTimeoutError
 from zope.interface import implementer
 
-from pyvoltha_min.adapters.interface import IAdapterInterface
 from voltha_protos.inter_container_pb2 import IntType, InterAdapterMessage, StrType, Error, ErrorCode
 from voltha_protos.device_pb2 import Device, Port, ImageDownload, SimulateAlarmRequest, PmConfigs
 from voltha_protos.openflow_13_pb2 import FlowChanges, FlowGroups, Flows, \
     FlowGroupChanges, ofp_packet_out
-from voltha_protos.extensions_pb2 import SingleGetValueRequest
+from voltha_protos.extensions_pb2 import SingleGetValueRequest, SingleGetValueResponse, GetValueResponse
 from voltha_protos.voltha_pb2 import OmciTestRequest, FlowMetadata, ValueSpecifier
-from pyvoltha_min.adapters.kafka.kafka_inter_container_library import get_messaging_proxy, \
-    ARG_FROM_TOPIC
+
+from ..interface import IAdapterInterface
+from .kafka_inter_container_library import get_messaging_proxy, ARG_FROM_TOPIC
 
 log = structlog.get_logger()
 
 
 class MacAddressError(BaseException):
     def __init__(self, error):
+        super().__init__()
         self.error = error
 
 
 class IDError(BaseException):
     def __init__(self, error):
+        super().__init__()
         self.error = error
 
 
 @implementer(IAdapterInterface)
-class AdapterRequestFacade:
+class AdapterRequestFacade:             # pylint: disable=too-many-public-methods
     """
     Gate-keeper between CORE and device adapters.
 
@@ -63,11 +66,11 @@ class AdapterRequestFacade:
 
     @inlineCallbacks
     def start(self):
-        log.debug('starting')
+        log.debug('starting', adapter=str(self.adapter))
 
     @inlineCallbacks
     def stop(self):
-        log.debug('stopping')
+        log.debug('stopping', adapter=str(self.adapter))
 
     def start_omci_test(self, device, omcitestrequest, **_kwargs):
         if not device:
@@ -92,10 +95,10 @@ class AdapterRequestFacade:
             # Update the core reference for that device as it will be used
             # by the adapter to send async messages to the Core.
             if ARG_FROM_TOPIC in kwargs:
-                t = StrType()
-                kwargs[ARG_FROM_TOPIC].Unpack(t)
+                str_arg = StrType()
+                kwargs[ARG_FROM_TOPIC].Unpack(str_arg)
                 # Update the core reference for that device
-                self.core_proxy.update_device_core_reference(d.id, t.val)
+                self.core_proxy.update_device_core_reference(d.id, str_arg.val)
 
             # # Start the creation of a device specific topic to handle all
             # # subsequent requests from the Core. This adapter instance will
@@ -165,11 +168,11 @@ class AdapterRequestFacade:
         else:
             return False, Error(code=ErrorCode.INVALID_PARAMETERS,
                                 reason="device-invalid")
-        pm = PmConfigs()
+        pm_config = PmConfigs()
         if pm_configs:
-            pm_configs.Unpack(pm)
+            pm_configs.Unpack(pm_config)
 
-        return True, self.adapter.update_pm_config(d, pm)
+        return True, self.adapter.update_pm_config(d, pm_config)
 
     def download_image(self, device, request, **_kwargs):
         d = Device()
@@ -251,54 +254,54 @@ class AdapterRequestFacade:
 
         return True, self.adapter.revert_image_update(device, request)
 
-    def enable_port(self, deviceId, port, **_kwargs):
-        if not deviceId:
+    def enable_port(self, device_id, port, **_kwargs):
+        if not device_id:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
                                 reason="device-id")
         if not port:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
                                 reason="port-invalid")
-        t = StrType()
-        deviceId.Unpack(t)
-        p = Port()
-        port.Unpack(p)
+        str_arg = StrType()
+        device_id.Unpack(str_arg)
+        port_arg = Port()
+        port.Unpack(port_arg)
 
-        return True, self.adapter.enable_port(t.val, p.port_no)
+        return True, self.adapter.enable_port(str_arg.val, port_arg.port_no)
 
-    def disable_port(self, deviceId, port, **_kwargs):
-        if not deviceId:
+    def disable_port(self, device_id, port, **_kwargs):
+        if not device_id:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
                                 reason="device-id")
         if not port:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
                                 reason="port-invalid")
-        t = StrType()
-        deviceId.Unpack(t)
-        p = Port()
-        port.Unpack(p)
+        str_arg = StrType()
+        device_id.Unpack(str_arg)
+        port_arg = Port()
+        port.Unpack(port_arg)
 
-        return True, self.adapter.disable_port(t.val, p.port_no)
+        return True, self.adapter.disable_port(str_arg.val, port_arg.port_no)
 
-    def child_device_lost(self, pDeviceId, pPortNo, onuID, **_kwargs):
-        if not pDeviceId:
+    def child_device_lost(self, device_id, port_no_arg, onu_id, **_kwargs):
+        if not device_id:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
                                 reason="device-id")
-        if not pPortNo:
+        if not port_no_arg:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
-                                reason="p-port-no")
-        if not onuID:
+                                reason="port-number")
+        if not onu_id:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
                                 reason="onu-id")
-        t = StrType()
-        pDeviceId.Unpack(t)
+        str_arg = StrType()
+        device_id.Unpack(str_arg)
 
         port_no = IntType()
-        pPortNo.Unpack(port_no)
+        port_no_arg.Unpack(port_no)
 
         oid = IntType()
-        onuID.Unpack(oid)
+        onu_id.Unpack(oid)
 
-        return True, self.adapter.child_device_lost(t.val, port_no.val, oid.val)
+        return True, self.adapter.child_device_lost(str_arg.val, port_no.val, oid.val)
 
     def self_test(self, device, **_kwargs):
         return self.adapter.self_test_device(device)
@@ -331,15 +334,15 @@ class AdapterRequestFacade:
         else:
             return False, Error(code=ErrorCode.INVALID_PARAMETERS,
                                 reason="device-invalid")
-        f = Flows()
+        flow_info = Flows()
         if flows:
-            flows.Unpack(f)
+            flows.Unpack(flow_info)
 
-        g = FlowGroups()
+        group_info = FlowGroups()
         if groups:
-            groups.Unpack(g)
+            groups.Unpack(group_info)
 
-        return True, self.adapter.update_flows_bulk(d, f, g)
+        return True, self.adapter.update_flows_bulk(d, flow_info, group_info)
 
     def update_flows_incrementally(self, device, flow_changes, group_changes, flow_metadata, **_kwargs):
         dev = Device()
@@ -369,9 +372,9 @@ class AdapterRequestFacade:
         return self.adapter.unsuppress_event(event_filter)
 
     def process_inter_adapter_message(self, msg, **kwargs):
-        m = InterAdapterMessage()
+        ia_msg = InterAdapterMessage()
         if msg:
-            msg.Unpack(m)
+            msg.Unpack(ia_msg)
         else:
             return False, Error(code=ErrorCode.INVALID_PARAMETERS,
                                 reason="msg-invalid")
@@ -380,40 +383,42 @@ class AdapterRequestFacade:
         if topic:
             topic.Unpack(from_topic)
 
-        log.debug('rx-message', message=m, from_topic=from_topic)
-        return True, self.adapter.process_inter_adapter_message(m, from_topic=from_topic.val)
+        log.debug('rx-message', message=ia_msg, from_topic=from_topic)
+        return True, self.adapter.process_inter_adapter_message(ia_msg, from_topic=from_topic.val)
 
-    def receive_packet_out(self, deviceId, outPort, packet, **_kwargs):
+    def receive_packet_out(self, device_id, out_port, packet, **_kwargs):
         try:
             d_id = StrType()
-            if deviceId:
-                deviceId.Unpack(d_id)
+            if device_id:
+                device_id.Unpack(d_id)
             else:
                 return False, Error(code=ErrorCode.INVALID_PARAMETERS,
                                     reason="device-id-invalid")
-            op = IntType()
-            if outPort:
-                outPort.Unpack(op)
+            port_number = IntType()
+            if out_port:
+                out_port.Unpack(port_number)
             else:
                 return False, Error(code=ErrorCode.INVALID_PARAMETERS,
                                     reason="outport-invalid")
 
-            p = ofp_packet_out()
+            pkt = ofp_packet_out()
             if packet:
-                packet.Unpack(p)
+                packet.Unpack(pkt)
             else:
                 return False, Error(code=ErrorCode.INVALID_PARAMETERS,
                                     reason="packet-invalid")
 
-            return True, self.adapter.receive_packet_out(d_id.val, op.val, p)
+            return True, self.adapter.receive_packet_out(d_id.val, port_number.val, pkt)
 
         except Exception as e:
             log.exception("error-processing-receive_packet_out", e=e)
+            return False, Error(code=ErrorCode.INVALID_PARAMETERS,
+                                reason="exception-during-processing: {}".format(str(e)))
 
     def simulate_alarm(self, device, request, **_kwargs):
-        d = Device()
+        dev = Device()
         if device:
-            device.Unpack(d)
+            device.Unpack(dev)
         else:
             return False, Error(code=ErrorCode.INVALID_PARAMETERS,
                                 reason="device-invalid")
@@ -424,13 +429,12 @@ class AdapterRequestFacade:
             return False, Error(code=ErrorCode.INVALID_PARAMETERS,
                                 reason="simulate-alarm-request-invalid")
 
-        return True, self.adapter.simulate_alarm(d, req)
+        return True, self.adapter.simulate_alarm(dev, req)
 
-    def get_ext_value(self, deviceId, device, value_flag, **_kwargs):
-
-        if deviceId:
-            t = StrType()
-            deviceId.Unpack(t)
+    def get_ext_value(self, device_id, device, value_flag, **_kwargs):
+        if device_id:
+            str_arg = StrType()
+            device_id.Unpack(str_arg)
         else:
             return False, Error(code=ErrorCode.INVALID_PARAMETER,
                                 reason="device-id")
@@ -447,16 +451,33 @@ class AdapterRequestFacade:
             return False, Error(code=ErrorCode.INVALID_PARAMETERS,
                                 reason="value-flag-invalid")
 
-        return True, self.adapter.get_ext_value(t.val, dev, value)
+        return True, self.adapter.get_ext_value(str_arg.val, dev, value)
 
     @inlineCallbacks
-    def single_get_value_request(self, request, **kwargs):
+    def single_get_value_request(self, request, **_kwargs):
         req = SingleGetValueRequest()
         if request:
             request.Unpack(req)
+            try:
+                result = self.adapter.single_get_value_request(req)
+                response = yield result
+
+            except NotImplementedError:
+                resp = GetValueResponse(status=GetValueResponse.Status.ERROR,
+                                        errReason=GetValueResponse.ErrorReason.UNSUPPORTED)
+                response = (True, SingleGetValueResponse(response=resp))
+
+            except TwistedTimeoutError:
+                resp = GetValueResponse(status=GetValueResponse.Status.ERROR,
+                                        errReason=GetValueResponse.ErrorReason.TIMEOUT)
+                response = (True, SingleGetValueResponse(response=resp))
+
+            except Exception as e:
+                log.exception('failed', e=e, request=request)
+                resp = GetValueResponse(status=GetValueResponse.Status.ERROR,
+                                        errReason=GetValueResponse.ErrorReason.REASON_UNDEFINED)
+                response = (True, SingleGetValueResponse(response=resp))
         else:
-            return False, Error(code=ErrorCode.INVALID_PARAMETERS,
-                                reason="request-invalid")
-        result = yield self.adapter.single_get_value_request(req)
-        res = yield result
-        return True, res
+            response = (False, Error(code=ErrorCode.INVALID_PARAMETERS,
+                                     reason="request-invalid"))
+        returnValue(response)

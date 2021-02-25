@@ -201,13 +201,6 @@ class IAdapterInterface(Interface):
         :return: Proto Message Response
         """
 
-    def single_get_value_request(msg):
-        """
-        Retrive a single type of attribute from a device.
-        :param msg: Proto Message (any)
-        :return: Proto Message Response
-        """
-
     def single_set_value_request(msg):
         """
         Set a single type of attribute of a device.
@@ -302,9 +295,18 @@ class IAdapterInterface(Interface):
         Missing
         """
 
-    def get_ext_valiue(device_id, deviceId, device, valueflag):
+    def get_ext_value(device_id, device, value_flag):
         """
-        Missing
+        :param device_id: (string) A voltha.Device.id object.
+        :param device: (Device)    A Voltha.Device object.
+        :param value_flag: (ValueType) A ValueType_Type object
+        """
+
+    def single_get_value_request(request):
+        """
+        Retrive a single type of attribute from a device.
+        :param request: extension.SingleGetValueRequest object
+        :return: Proto Message SingleGetValueResponse
         """
 
 class ICoreSouthBoundInterface(Interface):

@@ -303,8 +303,10 @@ class OltAdapter(IAdapter):
                 # basic children data structures
                 self.core_proxy.reconcile_child_devices(device.id)
             return device
+
         except Exception as e:
             log.exception('Exception', e=e)
+            return None
 
     def send_proxied_message(self, proxy_address, msg):
         log.debug('send-proxied-message', proxy_address=proxy_address, msg=msg)
