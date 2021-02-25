@@ -33,6 +33,12 @@ Installation instruction
 
 Release Notes
 -------------
+v2.7.1 (2021-02-xx)
+^^^^^^^^^^^^^^^^^^^
+ - IAdapter API get_ext_value() and single_get_value_request() support
+ - Do not report KPI metric if not supported by adapter (return of None)
+ - pylint cleanup (adapter_request_facade.py primarily)
+
 v2.7.0 (2021-02-23)
 ^^^^^^^^^^^^^^^^^^^
  - Updated to latest voltha-protos (4.0.13), protobuf (3.15.0), structlog (21.1.0),
