@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import division
-
 import random
 import arrow
 import structlog
@@ -144,9 +142,11 @@ class AdapterPmMetrics:
             if config[metric].type == PmConfig.CONTEXT and hasattr(group, metric):
                 context[metric] = str(getattr(group, metric))
 
-            elif config[metric].type in (PmConfig.COUNTER, PmConfig.GAUGE, PmConfig.STATE):
-                if config[metric].enabled and hasattr(group, metric):
-                    metrics[metric] = getattr(group, metric)
+            elif config[metric].type in (PmConfig.COUNTER, PmConfig.GAUGE, PmConfig.STATE) and config[metric].enabled:
+                value = getattr(group, metric, None)
+                # Do not report KPI metric if not supported by adapter (return of None)
+                if value is not None:
+                    metrics[metric] = value
 
         # Check length of metric data. Will be zero if if/when individual group
         # metrics can be disabled and all are (or or not supported by the
