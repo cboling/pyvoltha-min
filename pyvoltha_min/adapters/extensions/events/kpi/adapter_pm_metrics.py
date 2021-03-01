@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
 import random
 import arrow
 import structlog
@@ -67,8 +68,8 @@ class AdapterPmMetrics:
         self._sub_category = kwargs.get('subcategory', EventSubCategory.OLT)
         self.grouped = grouped
         self.freq_override = grouped and freq_override
-        self.lp_callback = None
         self.pm_group_metrics = dict()      # name -> PmGroupConfig
+        self.lp_callbacks = dict()          # name -> LoopingCallback
         self.max_skew = max_skew
 
     def update(self, pm_config):
@@ -88,22 +89,25 @@ class AdapterPmMetrics:
         if callback is None:
             callback = self.collect_and_publish_metrics
 
-        if self.lp_callback is None:
-            self.lp_callback = LoopingCall(callback)
+        for name, group_config in self.pm_group_metrics.items():
+            if name not in self.lp_callbacks:
+                self.lp_callbacks[name] = LoopingCall(callback, group_name=name)
 
-        if self.default_freq > 0 and not self.lp_callback.running:
-            # Adjust next time if there is a skew
-            interval = self.default_freq / 10
-            if self.max_skew != 0:
-                skew = random.uniform(-interval * (self.max_skew / 100), interval * (self.max_skew / 100))   # nosec
-                interval += skew
+            if self.default_freq > 0 and group_config.group_freq > 0 and \
+                not self.lp_callbacks[name].running:
+                # Adjust next time if there is a skew
+                interval = group_config.group_freq
+                if self.max_skew != 0:
+                    skew = random.uniform(-interval * (self.max_skew / 100), interval * (self.max_skew / 100))  # nosec
+                    interval += skew
 
-            self.lp_callback.start(interval=interval)
+                self.lp_callbacks[name].start(interval=interval)
 
     def stop_collector(self):
         """ Stop the collection loop"""
-        if self.lp_callback is not None and self.lp_callback.running:
-            self.lp_callback.stop()
+        for name, _ in self.pm_group_metrics.items():
+            if name in self.lp_callbacks and self.lp_callbacks[name].running:
+                self.lp_callbacks[name].stop()
 
     def collect_group_metrics(self, group_name, group, names, config):
         """
@@ -162,7 +166,7 @@ class AdapterPmMetrics:
                                                          context=context),
                                  metrics=metrics)
 
-    def collect_metrics(self, data=None):
+    def collect_metrics(self, group_name=None, data=None):
         """
         Collect metrics for this adapter.
 
@@ -180,6 +184,7 @@ class AdapterPmMetrics:
               This needs to be fixed as independent group or instance collection is
               desirable.
 
+        :param group_name: (str) Individual group name or None for all groups
         :param data: (list) Existing list of collected metrics (MetricInformation).
                             This is provided to allow derived classes to call into
                             further encapsulated classes.
@@ -188,14 +193,14 @@ class AdapterPmMetrics:
         """
         raise NotImplementedError('Your derived class should override this method')
 
-    def collect_and_publish_metrics(self):
+    def collect_and_publish_metrics(self, group_name=None):
         """ Request collection of all enabled metrics and publish them """
         try:
             self.log.debug('entry')
 
             # Collect the data
-            data = self.collect_metrics()
-            raised_ts = arrow.utcnow().timestamp
+            data = self.collect_metrics(group_name=group_name)
+            raised_ts = time.time_ns()
             self.publish_metrics(data, raised_ts)
 
         except Exception as e:

@@ -33,7 +33,12 @@ Installation instruction
 
 Release Notes
 -------------
-v2.7.1 (2021-02-xx)
+v2.7.2 (2021-03-xx)
+^^^^^^^^^^^^^^^^^^^
+ - Support independent group poll frequencies.  Default still 15 seconds.  Zero group
+   frequency to disable that group. Zero default frequency to disable all groups
+
+v2.7.1 (2021-02-25)
 ^^^^^^^^^^^^^^^^^^^
  - IAdapter API get_ext_value() and single_get_value_request() support
  - Do not report KPI metric if not supported by adapter (return of None)

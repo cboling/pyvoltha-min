@@ -189,48 +189,54 @@ class OltPmMetrics(AdapterPmMetrics):
     def update(self, pm_config):    # pylint: disable=too-many-branches
         self.log.debug('update-pm-config', pm_config=pm_config)
         try:
-            restart = False
+            restart = set()
 
             if self.default_freq != pm_config.default_freq:
                 if pm_config.default_freq < MIN_PM_FREQUENCY and pm_config.default_freq != 0:
                     self.log.warn('invalid-pm-frequency', value=pm_config.default_freq,
                                   minimum=MIN_PM_FREQUENCY)
-
                 else:
                     # Update the callback to the new frequency.
                     self.default_freq = pm_config.default_freq
-                    restart = True
+                    restart = set(self.pm_group_metrics.keys())
 
             if self.max_skew != pm_config.max_skew:
                 if MIN_PM_SKEW <= pm_config.max_skew <= MAX_PM_SKEW:
                     self.max_skew = pm_config.max_skew
-                    restart = True
+                    restart = set(self.pm_group_metrics.keys())
 
                 else:
                     self.log.warn('invalid-pm-skew', value=pm_config.max_skew,
                                   minimum=MIN_PM_SKEW, maximum=MAX_PM_SKEW)
 
-            if restart and self.lp_callback is not None:
-                if self.lp_callback.running:
-                    self.lp_callback.stop()
-
-                if self.default_freq > 0:
-                    # Adjust next time if there is a skew
-                    interval = self.default_freq / 10
-                    if self.max_skew != 0:
-                        skew = random.uniform(-interval * (self.max_skew / 100),
-                                              interval * (self.max_skew / 100))  # nosec
-                        interval += skew
-                    self.lp_callback.start(interval=interval)
-
             if pm_config.grouped:
                 for group in pm_config.groups:
                     group_config = self.pm_group_metrics.get(group.group_name)
                     if group_config is not None:
-                        group_config.enabled = group.enabled
+                        if group_config.enabled != group.enabled or group_config.group_freq != group.group_freq:
+                            group_config.enabled = group.enabled
+                            group_config.group_freq = group.group_freq
+                            restart.add(group.group_name)
             else:
                 msg = 'There are no independent OLT metrics, only group metrics at this time'
                 raise NotImplementedError(msg)
+
+            for name in restart:
+                if name not in self.lp_callbacks:
+                    continue
+
+                if self.lp_callbacks[name].running:
+                    self.lp_callbacks[name].stop()
+
+                group_config = self.pm_group_metrics.get(name)
+                if group_config.group_freq > 0 and self.default_freq:
+                    # Adjust next time if there is a skew
+                    interval = group_config.group_freq
+                    if self.max_skew != 0:
+                        skew = random.uniform(-interval * (self.max_skew / 100),
+                                              interval * (self.max_skew / 100))  # nosec
+                        interval += skew
+                    self.lp_callbacks[name].start(interval=interval)
 
         except Exception as e:
             self.log.exception('update-failure', e=e)
@@ -340,7 +346,7 @@ class OltPmMetrics(AdapterPmMetrics):
 
         return pm_config
 
-    def collect_metrics(self, data=None):   # pylint: disable=too-many-branches
+    def collect_metrics(self, group_name=None, data=None):   # pylint: disable=too-many-branches
         """
         Collect metrics for this adapter.
 
@@ -354,6 +360,7 @@ class OltPmMetrics(AdapterPmMetrics):
               This needs to be fixed as independent group or instance collection is
               desirable.
 
+        :param group_name: (str) Individual group name or None for all groups
         :param data: (list) Existing list of collected metrics (MetricInformation).
                             This is provided to allow derived classes to call into
                             further encapsulated classes.
@@ -364,50 +371,57 @@ class OltPmMetrics(AdapterPmMetrics):
         if data is None:
             data = list()
 
-        group_name = 'ETHERNET_NNI'
-        if self.pm_group_metrics[group_name].enabled:
-            for port in self._nni_ports:
-                group_data = self.collect_group_metrics(group_name,
-                                                        port,
-                                                        self.nni_pm_names,
-                                                        self.nni_metrics_config)
-                if group_data is not None:
-                    data.append(group_data)
+        if group_name is None:
+            group_metrics = list(self.pm_group_metrics.values())
+        else:
+            group_metrics = [self.pm_group_metrics.get(group_name)]
 
-        for port in self._pon_ports:      # pylint: disable=too-many-nested-blocks
-            group_name = 'PON_OLT'
-            if self.pm_group_metrics[group_name].enabled:
-                group_data = self.collect_group_metrics(group_name,
-                                                        port,
-                                                        self.pon_pm_names,
-                                                        self.pon_metrics_config)
-                if group_data is not None:
-                    data.append(group_data)
+        for group_metric in group_metrics:  # pylint: disable=too-many-nested-blocks
+            if not group_metric or not group_metric.enabled:
+                continue
 
-            if self.support_onu_stats:
-                for onu_id in port.onu_ids:
-                    onu = port.onu(onu_id)
-                    if onu is not None:
-                        group_name = 'ONU'
-                        if self.pm_group_metrics[group_name].enabled:
-                            group_data = self.collect_group_metrics(group_name,
-                                                                    onu,
-                                                                    self.onu_pm_names,
-                                                                    self.onu_metrics_config)
-                            if group_data is not None:
-                                data.append(group_data)
+            if group_metric.group_name == 'ETHERNET_NNI':
+                for port in self._nni_ports:
+                    group_data = self.collect_group_metrics(group_metric.group_name,
+                                                            port,
+                                                            self.nni_pm_names,
+                                                            self.nni_metrics_config)
+                    if group_data is not None:
+                        data.append(group_data)
 
-                    if self.support_gem_stats:
-                        group_name = 'GEM'
-                        if self.pm_group_metrics[group_name].enabled:
-                            for gem in onu.gem_ports:
-                                if not gem.multicast:
-                                    group_data = self.collect_group_metrics(group_name,
-                                                                            onu,
-                                                                            self.gem_pm_names,
-                                                                            self.gem_metrics_config)
-                                    if group_data is not None:
-                                        data.append(group_data)
+            elif group_metric.group_name in ('PON_OLT', 'ONU', 'GEM'):
+                for port in self._pon_ports:      # pylint: disable=too-many-nested-blocks
+                    if group_metric.group_name == 'PON_OLT':
+                        group_data = self.collect_group_metrics(group_metric.group_name,
+                                                                port,
+                                                                self.pon_pm_names,
+                                                                self.pon_metrics_config)
+                        if group_data is not None:
+                            data.append(group_data)
 
-                            # TODO: Do any multicast GEM PORT metrics here...
+                    elif self.support_onu_stats and group_metric.group_name == 'ONU':
+                        for onu_id in port.onu_ids:
+                            onu = port.onu(onu_id)
+                            if onu is not None:
+                                group_data = self.collect_group_metrics(group_metric.group_name,
+                                                                        onu,
+                                                                        self.onu_pm_names,
+                                                                        self.onu_metrics_config)
+                                if group_data is not None:
+                                    data.append(group_data)
+
+                    elif self.support_gem_stats and group_metric.group_name == 'GEM':
+                        for onu_id in port.onu_ids:
+                            onu = port.onu(onu_id)
+                            if onu is not None:
+                                for gem_port in onu.gem_ports:
+                                    if not gem_port.multicast:
+                                        group_data = self.collect_group_metrics(group_metric.group_name,
+                                                                                gem_port,
+                                                                                self.gem_pm_names,
+                                                                                self.gem_metrics_config)
+                                        if group_data is not None:
+                                            data.append(group_data)
+
+                        # TODO: Do any multicast GEM PORT metrics here...
         return data
