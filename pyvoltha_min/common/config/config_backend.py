@@ -142,5 +142,5 @@ class EtcdStore:
             retries += 1
 
         now = time.monotonic()
-        self.log.info(operation, delta=now-start, retries=retries)
+        self.log.debug(operation, delta=now-start, retries=retries)
         return result
