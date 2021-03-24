@@ -33,7 +33,17 @@ Installation instruction
 
 Release Notes
 -------------
-v2.7.2 (2021-03-xx)
+v2.7.3 (2021-03-24)
+^^^^^^^^^^^^^^^^^^^
+ - Dropping support for python 3.5.  Recommend 3.8 at this time as it is the focus of the
+   most testing so far.
+ - Upgraded twisted version to 21.2.0.  Will be looking at better ContextVar support for
+   maintaining OpenTracing context in future version.  See Twisted 21.2.0 release notes for
+   more information.  Also allows for official support of Python 3.8
+ - Upgrade to latest Arrow release.  Eventually arrow may be removed in order to use latest
+   versions of python time modules.
+-------------
+v2.7.2 (2021-03-01)
 ^^^^^^^^^^^^^^^^^^^
  - Support independent group poll frequencies.  Default still 15 seconds.  Zero group
    frequency to disable that group. Zero default frequency to disable all groups
