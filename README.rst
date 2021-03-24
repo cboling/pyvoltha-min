@@ -42,7 +42,7 @@ v2.7.3 (2021-03-24)
    more information.  Also allows for official support of Python 3.8
  - Upgrade to latest Arrow release.  Eventually arrow may be removed in order to use latest
    versions of python time modules.
--------------
+
 v2.7.2 (2021-03-01)
 ^^^^^^^^^^^^^^^^^^^
  - Support independent group poll frequencies.  Default still 15 seconds.  Zero group
