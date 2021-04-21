@@ -14,7 +14,6 @@
 
 import time
 import random
-import arrow
 import structlog
 from twisted.internet.task import LoopingCall
 from voltha_protos.device_pb2 import PmConfig
@@ -137,7 +136,7 @@ class AdapterPmMetrics:
 
         now = getattr(group, AdapterPmMetrics.TIMESTAMP_ATTRIBUTE) \
             if hasattr(group, AdapterPmMetrics.TIMESTAMP_ATTRIBUTE) \
-            else arrow.utcnow().float_timestamp
+            else time.time()
 
         if now is None:
             return None     # No metrics available at this time for collection
@@ -226,7 +225,7 @@ class AdapterPmMetrics:
         if len(data) > 0:
             try:
                 event_body = KpiEvent2(type=KpiEventType.slice,
-                                       ts=arrow.utcnow().float_timestamp,
+                                       ts=time.time(),
                                        slice_data=data)
                 self.event_mgr.send_event(event_header, event_body)
 

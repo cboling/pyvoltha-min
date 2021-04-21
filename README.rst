@@ -33,6 +33,10 @@ Installation instruction
 
 Release Notes
 -------------
+v2.7.4 (2021-04-xx)
+^^^^^^^^^^^^^^^^^^^
+ - Remove dependency on arrow module, use python 3's time builtin module instead
+
 v2.7.3 (2021-03-24)
 ^^^^^^^^^^^^^^^^^^^
  - Dropping support for python 3.5.  Recommend 3.8 at this time as it is the focus of the
