@@ -197,7 +197,17 @@ class IAdapterInterface(Interface):
         the responsibility of the sending and receiving adapters to properly encode
         and decode the message.
         :param msg: Proto Message (any)
-        :param from_topic: Sending endpoint (str)
+        :return: Proto Message Response
+        """
+
+    def process_inter_adapter_message(msg):
+        """
+        Called when the adapter receives a message that was sent to it directly
+        from another adapter. An adapter is automatically registered for these
+        messages when creating the inter-container kafka proxy. Note that it is
+        the responsibility of the sending and receiving adapters to properly encode
+        and decode the message.
+        :param msg: Proto Message (any)
         :return: Proto Message Response
         """
 
@@ -308,6 +318,25 @@ class IAdapterInterface(Interface):
         :param request: extension.SingleGetValueRequest object
         :return: Proto Message SingleGetValueResponse
         """
+
+    def download_onu_image(request):
+        """ Not implemented since pyvoltha-min targets OLTs only """
+
+    def get_onu_image_status(request):
+        """ Not implemented since pyvoltha-min targets OLTs only """
+
+    def abort_onu_image_upgrade(request):
+        """ Not implemented since pyvoltha-min targets OLTs only """
+
+    def get_onu_images(request):
+        """ Not implemented since pyvoltha-min targets OLTs only """
+
+    def activate_onu_image(request):
+        """ Not implemented since pyvoltha-min targets OLTs only """
+
+    def commit_onu_image(request):
+        """ Not implemented since pyvoltha-min targets OLTs only """
+
 
 class ICoreSouthBoundInterface(Interface):
     """

@@ -17,15 +17,17 @@
 """
 A simple internal pub/sub event bus with topics and filter-based registration.
 """
+from copy import copy
+
 import six
 import structlog
 
 log = structlog.get_logger()
 
 
-class _Subscription(object):
-
+class _Subscription:    # pylint: disable=too-few-public-methods
     __slots__ = ('bus', 'predicate', 'callback', 'topic')
+
     def __init__(self, bus, predicate, callback, topic=None):
         self.bus = bus
         self.predicate = predicate
@@ -33,30 +35,29 @@ class _Subscription(object):
         self.topic = topic
 
 
-class EventBus(object):
+class EventBus:
 
     def __init__(self):
-        self.subscriptions = {}  # topic -> list of _Subscription objects
-                                 # topic None holds regexp based topic subs.
-        self.subs_topic_map = {} # to aid fast lookup when unsubscribing
+        self.subscriptions = {}   # topic -> list of _Subscription objects
+                                  # topic None holds regexp based topic subs.
+        self.subs_topic_map = {}  # to aid fast lookup when unsubscribing
 
     def list_subscribers(self, topic=None):
         if topic is None:
             return sum(six.itervalues(self.subscriptions), [])
-        else:
-            if topic in self.subscriptions:
-                return self.subscriptions[topic]
-            else:
-                return []
+
+        if topic in self.subscriptions:
+            return self.subscriptions[topic]
+
+        return []
 
     @staticmethod
     def _get_topic_key(topic):
         if isinstance(topic, str):
             return topic
-        elif hasattr(topic, 'match'):
+        if hasattr(topic, 'match'):
             return None
-        else:
-            raise AttributeError('topic not a string nor a compiled regex')
+        raise AttributeError('topic not a string nor a compiled regex')
 
     def subscribe(self, topic, callback, predicate=None):
         """
@@ -79,10 +80,10 @@ class EventBus(object):
         :return: None
         """
         try:
-           topic_key = self.subs_topic_map[subscription]
-           self.subscriptions[topic_key].remove(subscription)
+            topic_key = self.subs_topic_map[subscription]
+            self.subscriptions[topic_key].remove(subscription)
         except KeyError:
-           log.error('key not found', key=subscription)
+            log.error('key not found', key=subscription)
 
     def publish(self, topic, msg):
         """
@@ -92,12 +93,10 @@ class EventBus(object):
         :param msg: Arbitrary python data as message
         :return: None
         """
-        from copy import copy
-
         def passes(msg, predicate):
             try:
                 return predicate(msg)
-            except Exception as e:
+            except Exception as _e:
                 return False  # failed predicate function treated as no match
 
         # lookup subscribers with explicit topic subscriptions
@@ -121,7 +120,7 @@ class EventBus(object):
 default_bus = EventBus()
 
 
-class EventBusClient(object):
+class EventBusClient:
     """
     Primary interface to the EventBus. Usage:
 

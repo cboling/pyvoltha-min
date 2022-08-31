@@ -54,7 +54,7 @@ class JsonRenderedOrderedDict(OrderedDict):
     def __repr__(self, _repr_running=None):
         # od.__repr__() <==> repr(od)
         call_key = id(self), _get_ident()
-        _repr_running = _repr_running or dict()
+        _repr_running = _repr_running or {}
 
         if call_key in _repr_running:
             return '...'

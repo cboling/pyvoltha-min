@@ -81,7 +81,7 @@ def _get_my_primary_local_ipv4(ifname=None):
         addresses = ni.ifaddresses(ifname)
         ipv4 = addresses[AF_INET][0]['addr']
         return ipv4
-    except Exception as e:
+    except Exception as _e:
         return None
 
 

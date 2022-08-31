@@ -33,7 +33,15 @@ Installation instruction
 
 Release Notes
 -------------
-v2.7.4 (2021-04-xx)
+v2.8.0 (2022-02-01)
+^^^^^^^^^^^^^^^^^^^
+ - Pull in v2.8 (release) voltha-protos definitions and python generated code and
+   cleaned up any pylint issues.  Several 'FIXME' declarations made to track issues
+   that need to be addressed.  Primary reason for creation is to help with v2.8
+   development alongside a python device adapter.
+ - pylint cleanups so new version issues are easier to identify
+
+v2.7.4 (2021-04-01)
 ^^^^^^^^^^^^^^^^^^^
  - Remove dependency on arrow module, use python 3's time builtin module instead
 

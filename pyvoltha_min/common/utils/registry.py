@@ -44,7 +44,7 @@ class IComponent(Interface):
         """
 
 
-class Registry(object):
+class Registry:
 
     def __init__(self):
         self.components = OrderedDict()

@@ -39,7 +39,7 @@ class CoreProxy(ContainerProxy):  # pylint: disable=too-many-public-methods
         super().__init__(kafka_proxy, default_core_topic, my_listening_topic, default_timeout=default_timeout)
         self.core_default_topic = default_core_topic
         self.event_default_topic = default_event_topic
-        self.device_id_to_core_map = dict()
+        self.device_id_to_core_map = {}
 
     def update_device_core_reference(self, device_id, core_topic):
         log.debug("update_device_core_reference")
@@ -193,7 +193,7 @@ class CoreProxy(ContainerProxy):  # pylint: disable=too-many-public-methods
                 b_proto.val = val
                 encoded[k] = b_proto
             else:
-                raise TypeError('Unsupported type: {} for key {}'.format(type(val), k))
+                raise TypeError(f'Unsupported type: {type(val)} for key {k}')
         return encoded
 
     @ContainerProxy.wrap_request(Device)

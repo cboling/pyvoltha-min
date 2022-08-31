@@ -105,5 +105,3 @@ def twisted_async(func):
         return result
 
     return in_thread_wrapper
-
-

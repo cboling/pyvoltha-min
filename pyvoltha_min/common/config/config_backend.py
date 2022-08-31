@@ -13,9 +13,9 @@
 # limitations under the License.
 #
 import codecs
+import time
 
 import etcd3
-import time
 import structlog
 from twisted.internet.defer import inlineCallbacks
 
@@ -46,7 +46,7 @@ class EtcdStore:
         self.retries = 0
 
     def make_path(self, key):
-        return '{}/{}'.format(self._path_prefix, key)
+        return f'{self._path_prefix}/{key}'
 
     def __getitem__(self, key):
         (value, _meta) = self._kv_get(self.make_path(key))

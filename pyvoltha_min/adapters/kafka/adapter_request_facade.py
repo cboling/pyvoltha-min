@@ -19,19 +19,18 @@ This facade handles kafka-formatted messages from the Core, extracts the kafka
 formatting and forwards the request to the concrete handler.
 """
 import structlog
-from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.defer import TimeoutError as TwistedTimeoutError
-from zope.interface import implementer
-
-from voltha_protos.inter_container_pb2 import IntType, InterAdapterMessage, StrType, Error, ErrorCode
+from twisted.internet.defer import inlineCallbacks, returnValue
 from voltha_protos.device_pb2 import Device, Port, ImageDownload, SimulateAlarmRequest, PmConfigs
+from voltha_protos.extensions_pb2 import SingleGetValueRequest, SingleGetValueResponse, GetValueResponse
+from voltha_protos.inter_container_pb2 import IntType, InterAdapterMessage, StrType, Error, ErrorCode
 from voltha_protos.openflow_13_pb2 import FlowChanges, FlowGroups, Flows, \
     FlowGroupChanges, ofp_packet_out
-from voltha_protos.extensions_pb2 import SingleGetValueRequest, SingleGetValueResponse, GetValueResponse
 from voltha_protos.voltha_pb2 import OmciTestRequest, FlowMetadata, ValueSpecifier
+from zope.interface import implementer
 
-from ..interface import IAdapterInterface
 from .kafka_inter_container_library import get_messaging_proxy, ARG_FROM_TOPIC
+from ..interface import IAdapterInterface
 
 log = structlog.get_logger()
 
@@ -386,6 +385,21 @@ class AdapterRequestFacade:             # pylint: disable=too-many-public-method
         log.debug('rx-message', message=ia_msg, from_topic=from_topic)
         return True, self.adapter.process_inter_adapter_message(ia_msg, from_topic=from_topic.val)
 
+    def process_tech_profile_instance_request(self, msg, **kwargs):
+        ia_msg = InterAdapterMessage()
+        if msg:
+            msg.Unpack(ia_msg)
+        else:
+            return False, Error(code=ErrorCode.INVALID_PARAMETERS,
+                                reason="msg-invalid")
+        from_topic = StrType()
+        topic = kwargs.get('fromTopic')
+        if topic:
+            topic.Unpack(from_topic)
+
+        log.debug('rx-tp-message', message=ia_msg, from_topic=from_topic)
+        return True, self.adapter.process_tech_profile_instance_request(ia_msg, from_topic=from_topic.val)
+
     def receive_packet_out(self, deviceId, outPort, packet, **_kwargs):       # pylint: disable=invalid-name
         try:
             d_id = StrType()
@@ -413,7 +427,7 @@ class AdapterRequestFacade:             # pylint: disable=too-many-public-method
         except Exception as e:
             log.exception("error-processing-receive_packet_out", e=e)
             return False, Error(code=ErrorCode.INVALID_PARAMETERS,
-                                reason="exception-during-processing: {}".format(str(e)))
+                                reason=f"exception-during-processing: {e}")
 
     def simulate_alarm(self, device, request, **_kwargs):
         dev = Device()

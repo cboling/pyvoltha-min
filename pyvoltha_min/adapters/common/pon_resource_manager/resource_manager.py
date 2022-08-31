@@ -159,19 +159,19 @@ class PONResourceManager:
 
             # Below attribute, pon_resource_ranges, should be initialized
             # by reading from KV store.
-            self.pon_resource_ranges = dict()
+            self.pon_resource_ranges = {}
             self.pon_resource_ranges[PONResourceManager.ONU_ID_SHARED_IDX] = None
             self.pon_resource_ranges[PONResourceManager.ALLOC_ID_SHARED_IDX] = None
             self.pon_resource_ranges[PONResourceManager.GEMPORT_ID_SHARED_IDX] = None
             self.pon_resource_ranges[PONResourceManager.FLOW_ID_SHARED_IDX] = None
 
-            self.shared_resource_mgrs = dict()
+            self.shared_resource_mgrs = {}
             self.shared_resource_mgrs[PONResourceManager.ONU_ID_SHARED_IDX] = None
             self.shared_resource_mgrs[PONResourceManager.ALLOC_ID_SHARED_IDX] = None
             self.shared_resource_mgrs[PONResourceManager.GEMPORT_ID_SHARED_IDX] = None
             self.shared_resource_mgrs[PONResourceManager.FLOW_ID_SHARED_IDX] = None
 
-            self.shared_idx_by_type = dict()
+            self.shared_idx_by_type = {}
             self.shared_idx_by_type[PONResourceManager.ONU_ID] = PONResourceManager.ONU_ID_SHARED_IDX
             self.shared_idx_by_type[PONResourceManager.ALLOC_ID] = PONResourceManager.ALLOC_ID_SHARED_IDX
             self.shared_idx_by_type[PONResourceManager.GEMPORT_ID] = PONResourceManager.GEMPORT_ID_SHARED_IDX
@@ -547,14 +547,14 @@ class PONResourceManager:
                 if num_of_id == 1:
                     result = self._generate_next_id(resource)
                 else:
-                    result = list()
+                    result = []
                     while num_of_id > 0:
                         result.append(self._generate_next_id(resource))
                         num_of_id -= 1
 
             # Update resource in kv store
             self._update_resource(path, resource)
-            self._log.debug("allocated-{}".format(resource_type), result=result)
+            self._log.debug(f"allocated-{resource_type}", result=result)
 
         except Exception as e:
             self._log.exception("Get-" + resource_type + "-id-failed",
@@ -650,13 +650,13 @@ class PONResourceManager:
         # initialize pon_intf_onu_id tuple to alloc_ids map
         alloc_id_path = PONResourceManager.ALLOC_ID_RESOURCE_MAP_PATH.format(self.device_id,
                                                                              str(pon_intf_onu_id))
-        alloc_ids = list()
+        alloc_ids = []
         self._kv_store.update_to_kv_store(alloc_id_path,
                                           json.dumps(alloc_ids))
         # initialize pon_intf_onu_id tuple to gemport_ids map
         gemport_id_path = PONResourceManager.GEMPORT_ID_RESOURCE_MAP_PATH.format(self.device_id,
                                                                                  str(pon_intf_onu_id))
-        gemport_ids = list()
+        gemport_ids = []
         self._kv_store.update_to_kv_store(gemport_id_path, json.dumps(gemport_ids))
 
     def remove_resource_map(self, pon_intf_onu_id):
@@ -828,7 +828,7 @@ class PONResourceManager:
         self._log.debug("update-flow-info-before", current_flow_ids=current_flow_ids, path=path)
         if not isinstance(current_flow_ids, list):
             # When the first flow_id is being added, the current_flow_ids is None
-            current_flow_ids = list()
+            current_flow_ids = []
 
         if add:
             if flow_id not in current_flow_ids:
@@ -1009,7 +1009,7 @@ class PONResourceManager:
         :return dictionary: resource formatted as dictionary
         """
         # Format resource as json to be stored in backend store
-        resource = dict()
+        resource = {}
         resource[PONResourceManager.PON_INTF_ID] = pon_intf_id
         resource[PONResourceManager.START_IDX] = start_idx
         resource[PONResourceManager.END_IDX] = end_idx

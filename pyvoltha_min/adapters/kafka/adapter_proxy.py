@@ -17,22 +17,22 @@
 """
 Agent to play gateway between adapters.
 """
-
 import codecs
+from typing import Optional, Union
 from uuid import uuid4
 
 import six
 import structlog
-from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.defer import TimeoutError as TwistedTimeoutErrorDefer
+from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.error import TimeoutError as TwistedTimeoutError
-
-from voltha_protos.inter_container_pb2 import InterAdapterHeader, InterAdapterMessage
 from voltha_protos.inter_container_pb2 import Error as InterAdapterError
 from voltha_protos.inter_container_pb2 import ErrorCode as InterAdapterErrorCode
+from voltha_protos.inter_container_pb2 import InterAdapterHeader, InterAdapterMessage, \
+    InterAdapterTechProfileDownloadMessage, InterAdapterTechProfileInstanceRequestMessage
 
-from pyvoltha_min.common.config.twisted_etcd_store import TwistedEtcdStore, DEFAULT_KVSTORE_TIMEOUT
 from pyvoltha_min.common.config.kvstore_prefix import KvStore
+from pyvoltha_min.common.config.twisted_etcd_store import TwistedEtcdStore, DEFAULT_KVSTORE_TIMEOUT
 from .container_proxy import ContainerProxy
 from .endpoint_manager import EndpointManager
 
@@ -130,7 +130,71 @@ class AdapterProxy(ContainerProxy):     # pylint: disable=too-few-public-methods
         except Exception as e:
             log.warn("error-sending-request", msg_type=msg_type, to_topic=ia_msg.header.to_topic, e=e)
             returnValue(InterAdapterError(code=InterAdapterErrorCode.UNSUPPORTED_REQUEST,
-                                          reason='exception: {}'.format(e)))
+                                          reason=f'exception: {e}'))
+
+    @ContainerProxy.wrap_request(None)
+    @inlineCallbacks
+    def tech_profile_instance_request(self, tp_path: str, pon_intf_id: int,
+                                      onu_id: int, uni_id: int,
+                                      from_adapter: str, to_adapter: str,
+                                      to_device: str, proxy_device_id: str,
+                                      response_required: Optional[bool] = True,
+                                      timeout: Optional[Union[None, int, float]] = None) -> InterAdapterTechProfileDownloadMessage:
+        # TODO: May never be called by OLT, just request handled and TP download returned
+        ia_msg = InterAdapterMessage()
+        try:
+            # # Set to_adapter
+            # to_adapter = to_adapter or self.remote_topic
+            #
+            # # HACK: If endpoint not provided assume a single replica instance
+            # if endpoint is None or len(endpoint) == 0:
+            #     endpoint = to_adapter + '_1'
+
+            # Build the inter adapter message
+            hdr = InterAdapterHeader()
+            # hdr.type = msg_type
+            hdr.from_topic = self._to_string(from_adapter)
+            # hdr.to_topic = self._to_string(endpoint)
+            # hdr.to_device_id = self._to_string(to_device_id)
+            # hdr.proxy_device_id = self._to_string(proxy_device_id)
+            # hdr.id = self._to_string(message_id) if message_id else uuid4().hex
+            hdr.timestamp.GetCurrentTime()
+
+            tp_msg = InterAdapterTechProfileInstanceRequestMessage()
+            tp_msg.tp_instance_path = tp_path
+            tp_msg.parent_device_id = "TODO"
+            tp_msg.parent_pon_port = pon_intf_id
+            tp_msg.onu_id = onu_id
+            tp_msg.uni_id = uni_id
+
+            ia_msg.header.CopyFrom(hdr)
+            ia_msg.body.Pack(tp_msg)
+
+            log.debug("sending-inter-adapter-message", type="TechProfileInstanceRequest",
+                      from_topic=ia_msg.header.from_topic, to_topic=ia_msg.header.to_topic,
+                      to_device_id=ia_msg.header.to_device_id)
+
+            results = yield self.invoke(rpc="process_inter_adapter_message",
+                                        to_topic=ia_msg.header.to_topic,
+                                        msg=ia_msg, response_required=response_required,
+                                        timeout=timeout)
+
+            log.debug("sent-inter-adapter-message", type="TechProfileInstanceRequest",
+                      from_topic=ia_msg.header.from_topic, to_topic=ia_msg.header.to_topic,
+                      to_device_id=ia_msg.header.to_device_id, result=results)
+
+            returnValue(results)
+
+        except (TwistedTimeoutError, TwistedTimeoutErrorDefer):
+            log.info("request-timeout", msg_type="TechProfileInstanceRequest",
+                     to_topic=ia_msg.header.to_topic)
+            returnValue(InterAdapterError(code=InterAdapterErrorCode.DEADLINE_EXCEEDED,
+                                          reason='Local deferred timeout'))
+        except Exception as e:
+            log.warn("error-sending-request", msg_type="TechProfileInstanceRequest",
+                     to_topic=ia_msg.header.to_topic, e=e)
+            returnValue(InterAdapterError(code=InterAdapterErrorCode.UNSUPPORTED_REQUEST,
+                                          reason=f'exception: {e}'))
 
     @property
     def endpoint_manager(self):

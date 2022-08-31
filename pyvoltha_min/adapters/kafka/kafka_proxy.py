@@ -82,12 +82,12 @@ class KafkaProxyStatistics:
         self.stats = KafkaStatistic()
 
         # Per topic/rpc statistics
-        self.messages_by_x = dict()   # topic/rpc -> count
+        self.messages_by_x = {}   # topic/rpc -> count
         self.msg_by_label = msg_by_label
 
     def clear(self):
         self.stats.clear()
-        self.messages_by_x = dict()
+        self.messages_by_x = {}
 
     def to_dict(self):
         stats = self.stats.to_dict()
@@ -122,7 +122,7 @@ class KafkaProxy:
         config = config or {}
         # return an exception if the object already exist
         if KafkaProxy._kafka_instance:
-            raise Exception('Singleton exist for :{}'.format(KafkaProxy))
+            raise Exception(f'Singleton exist for :{KafkaProxy}')
 
         log.debug('initializing', endpoint=kafka_endpoint)
         self.ack_timeout = ack_timeout
@@ -194,27 +194,23 @@ class KafkaProxy:
 
             # Stop all consumers
             try:
-                self.topic_any_map_lock.acquire()
-                log.debug('stopping-consumers-kafka-proxy', size=len(self.topic_consumer_map))
+                with self.topic_any_map_lock:
+                    log.debug('stopping-consumers-kafka-proxy', size=len(self.topic_consumer_map))
 
-                consumer_map, self.topic_consumer_map = self.topic_consumer_map, dict()
-                for _, consumer in consumer_map.items():
-                    d = deferToThread(consumer.close)
-                    d.addTimeout(0.3, reactor, lambda _: log.error('consumer-timeout'))
-                    d.addCallbacks(lambda _: log.debug('consumer-success'),
-                                   lambda _: None)
-                    # lambda reason: log.error('consumer-failure: {}'.format(str(reason))))
-                    dl.append(d)
+                    consumer_map, self.topic_consumer_map = self.topic_consumer_map, {}
+                    for _, consumer in consumer_map.items():
+                        d = deferToThread(consumer.close)
+                        d.addTimeout(0.3, reactor, lambda _: log.error('consumer-timeout'))
+                        d.addCallbacks(lambda _: log.debug('consumer-success'),
+                                       lambda _: None)
+                        # lambda reason: log.error('consumer-failure: {}'.format(str(reason))))
+                        dl.append(d)
 
-                self.topic_callbacks_map.clear()
-                log.debug('stopped-consumers-kafka-proxy')
+                    self.topic_callbacks_map.clear()
+                    log.debug('stopped-consumers-kafka-proxy')
 
             except Exception as e:
                 log.exception('failed-stopped-consumers-kafka-proxy', e=e)
-
-            finally:
-                self.topic_any_map_lock.release()
-                log.debug('stopping-consumers-kafka-proxy-released-lock')
 
             if len(dl) > 0:
                 try:
@@ -320,32 +316,31 @@ class KafkaProxy:
         """
         log.debug('entry', topic=topic, groupId=group_id)
         try:
-            self.topic_any_map_lock.acquire()
-            if topic in self.topic_consumer_map:
-                # Just add the callback
-                if topic in self.topic_callbacks_map:
-                    self.topic_callbacks_map[topic].append(callback)
-                else:
-                    self.topic_callbacks_map[topic] = [callback]
-                return
+            with self.topic_any_map_lock:
+                if topic in self.topic_consumer_map:
+                    # Just add the callback
+                    if topic in self.topic_callbacks_map:
+                        self.topic_callbacks_map[topic].append(callback)
+                    else:
+                        self.topic_callbacks_map[topic] = [callback]
+                    return
 
-            # Create consumer for that topic
-            consumer = Consumer({
-                'bootstrap.servers': self.kafka_endpoint,
-                'group.id': group_id,
-                'auto.offset.reset': offset
-            })
-            log.debug('sending-to-thread')
-            yield deferToThread(consumer.subscribe, [topic])
-            # consumer.subscribe([topic])
-            self.topic_consumer_map[topic] = consumer
-            self.topic_callbacks_map[topic] = [callback]
-            # Start the consumer
-            reactor.callLater(0, self._wait_for_messages, consumer, topic)
+                # Create consumer for that topic
+                consumer = Consumer({
+                    'bootstrap.servers': self.kafka_endpoint,
+                    'group.id': group_id,
+                    'auto.offset.reset': offset
+                })
+                log.debug('sending-to-thread')
+                yield deferToThread(consumer.subscribe, [topic])
+                # consumer.subscribe([topic])
+                self.topic_consumer_map[topic] = consumer
+                self.topic_callbacks_map[topic] = [callback]
+                # Start the consumer
+                reactor.callLater(0, self._wait_for_messages, consumer, topic)
+
         except Exception as e:
             log.exception("topic-subscription-error", e=e, topic=topic, group_id=group_id)
-        finally:
-            self.topic_any_map_lock.release()
 
     @inlineCallbacks
     def unsubscribe(self, topic, callback):
@@ -361,33 +356,30 @@ class KafkaProxy:
         :return:None
         """
         try:
-            self.topic_any_map_lock.acquire()
-            log.debug("unsubscribing-to-topic", topic=topic)
-            if topic in self.topic_callbacks_map:
-                index = 0
-                for cback in self.topic_callbacks_map[topic]:
-                    if cback == callback:
-                        break
-                    index += 1
-                if index < len(self.topic_callbacks_map[topic]):
-                    self.topic_callbacks_map[topic].pop(index)
+            with self.topic_any_map_lock:
+                log.debug("unsubscribing-to-topic", topic=topic)
+                if topic in self.topic_callbacks_map:
+                    index = 0
+                    for cback in self.topic_callbacks_map[topic]:
+                        if cback == callback:
+                            break
+                        index += 1
+                    if index < len(self.topic_callbacks_map[topic]):
+                        self.topic_callbacks_map[topic].pop(index)
 
-                if len(self.topic_callbacks_map[topic]) == 0:
-                    # Stop the consumer
-                    if topic in self.topic_consumer_map:
-                        yield deferToThread(
-                            self.topic_consumer_map[topic].close)
-                        del self.topic_consumer_map[topic]
-                    del self.topic_callbacks_map[topic]
-                    log.debug("unsubscribed-to-topic", topic=topic)
-                else:
-                    log.debug("consumers-for-topic-still-exist", topic=topic,
-                              num=len(self.topic_callbacks_map[topic]))
+                    if len(self.topic_callbacks_map[topic]) == 0:
+                        # Stop the consumer
+                        if topic in self.topic_consumer_map:
+                            yield deferToThread(
+                                self.topic_consumer_map[topic].close)
+                            del self.topic_consumer_map[topic]
+                        del self.topic_callbacks_map[topic]
+                        log.debug("unsubscribed-to-topic", topic=topic)
+                    else:
+                        log.debug("consumers-for-topic-still-exist", topic=topic,
+                                  num=len(self.topic_callbacks_map[topic]))
         except Exception as e:
             log.exception("topic-unsubscription-error", e=e)
-        finally:
-            self.topic_any_map_lock.release()
-            log.debug("unsubscribing-to-topic-release-lock", topic=topic)
 
     @inlineCallbacks
     def send_message(self, topic, msg, key=None, span=None):   # pylint: disable=too-many-branches

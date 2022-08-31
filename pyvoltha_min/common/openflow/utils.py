@@ -103,10 +103,10 @@ def mpls_ttl(ttl):
     )
 
 
-def push_vlan(eth_type):
+def push_vlan(e_type):
     return action(
         type=PUSH_VLAN,
-        push=ofp.ofp_action_push(ethertype=eth_type)
+        push=ofp.ofp_action_push(ethertype=e_type)
     )
 
 
@@ -116,10 +116,10 @@ def pop_vlan():
     )
 
 
-def pop_mpls(eth_type):
+def pop_mpls(e_type):
     return action(
         type=POP_MPLS,
-        pop_mpls=ofp.ofp_action_pop_mpls(ethertype=eth_type)
+        pop_mpls=ofp.ofp_action_pop_mpls(ethertype=e_type)
     )
 
 
@@ -130,10 +130,10 @@ def group(group_id):
     )
 
 
-def nw_ttl(nw_ttl):
+def nw_ttl(ttl):
     return action(
         type=NW_TTL,
-        nw_ttl=ofp.ofp_action_nw_ttl(nw_ttl=nw_ttl)
+        nw_ttl=ofp.ofp_action_nw_ttl(nw_ttl=ttl)
     )
 
 
@@ -147,11 +147,11 @@ def set_field(field):
     )
 
 
-def experimenter(experimenter, data):
+def experimenter(experimenter_val, data):
     return action(
         type=EXPERIMENTER,
         experimenter=ofp.ofp_action_experimenter(
-            experimenter=experimenter, data=data)
+            experimenter=experimenter_val, data=data)
     )
 
 
@@ -354,6 +354,7 @@ def get_actions(flow):
     for instruction in flow.instructions:
         if instruction.type == ofp.OFPIT_APPLY_ACTIONS:
             return instruction.actions.actions
+    return None
 
 
 def get_default_vlan(flow):
@@ -372,16 +373,18 @@ def get_ofb_fields(flow):
         ofb_fields.append(field.ofb_field)
     return ofb_fields
 
+
 def get_meter_id_from_flow(flow):
     for instruction in flow.instructions:
         if instruction.type == ofp.OFPIT_METER:
             return instruction.meter.meter_id
     return None
 
+
 def get_out_port(flow):
-    for action in get_actions(flow):
-        if action.type == OUTPUT:
-            return action.output.port
+    for flow_action in get_actions(flow):
+        if flow_action.type == OUTPUT:
+            return flow_action.output.port
     return None
 
 
@@ -410,11 +413,13 @@ def get_tunnelid(flow):
             return field.tunnel_id
     return None
 
+
 def is_dhcp_flow(flow):
     for field in get_ofb_fields(flow):
-        if field.type == UDP_SRC and (field.udp_src == IPV4_DHCP_SRC_PORT or field.udp_src == IPV6_DHCP_SRC_PORT):
+        if field.type == UDP_SRC and field.udp_src in (IPV4_DHCP_SRC_PORT, IPV6_DHCP_SRC_PORT):
             return True
     return False
+
 
 def get_metadata(flow):
     ''' legacy get method (only want lower 32 bits '''
@@ -438,18 +443,18 @@ def get_port_number_from_metadata(flow):
 
     This is set in the ONOS OltPipeline as a metadata field
     """
-    md = get_metadata_64_bit(flow)
+    mdata = get_metadata_64_bit(flow)
 
-    if md is None:
+    if mdata is None:
         return None
 
-    if md <= 0xffffffff:
+    if mdata <= 0xffffffff:
         log.warn('onos-upgrade-suggested',
-                 netadata=md,
+                 netadata=mdata,
                  message='Legacy MetaData detected form OltPipeline')
-        return md
+        return mdata
 
-    return md & 0xffffffff
+    return mdata & 0xffffffff
 
 
 def get_inner_tag_from_metadata(flow):
@@ -459,18 +464,18 @@ def get_inner_tag_from_metadata(flow):
 
     This is set in the ONOS OltPipeline as a metadata field
     """
-    md = get_metadata_64_bit(flow)
+    mdata = get_metadata_64_bit(flow)
 
-    if md is None:
+    if mdata is None:
         return None
 
-    if md <= 0xffffffff:
+    if mdata <= 0xffffffff:
         log.warn('onos-upgrade-suggested',
-                 netadata=md,
+                 netadata=mdata,
                  message='Legacy MetaData detected form OltPipeline')
-        return md
+        return mdata
 
-    return (md >> 32) & 0xffffffff
+    return (mdata >> 32) & 0xffffffff
 
 
 def get_child_port_from_tunnelid(flow):
@@ -493,9 +498,9 @@ def has_next_table(flow):
 
 
 def get_group(flow):
-    for action in get_actions(flow):
-        if action.type == GROUP:
-            return action.group.group_id
+    for flow_action in get_actions(flow):
+        if flow_action.type == GROUP:
+            return flow_action.group.group_id
     return None
 
 
@@ -563,13 +568,13 @@ def mk_simple_flow_mod(match_fields, actions, command=ofp.OFPFC_ADD,
 
 
 def mk_multicast_group_mod(group_id, buckets, command=ofp.OFPGC_ADD):
-    group = ofp.ofp_group_mod(
+    mc_group = ofp.ofp_group_mod(
         command=command,
         type=ofp.OFPGT_ALL,
         group_id=group_id,
         buckets=buckets
     )
-    return group
+    return mc_group
 
 
 def hash_flow_stats(flow):
@@ -581,15 +586,10 @@ def hash_flow_stats(flow):
     for _instruction in flow.instructions:
         _instruction_string += _instruction.SerializeToString()
 
-    hex = md5('{},{},{},{},{},{}'.format(                           # nosec
-        flow.table_id,
-        flow.priority,
-        flow.flags,
-        flow.cookie,
-        flow.match.SerializeToString(),
-        _instruction_string
-    )).hexdigest()
-    return int(hex[:16], 16)
+    fmt = f'{flow.table_id},{flow.priority},{flow.flags},{flow.cookie},{flow.match.SerializeToString()},{_instruction_string}'
+    hex_val = md5(fmt).hexdigest()
+
+    return int(hex_val[:16], 16)
 
 
 def flow_stats_entry_from_flow_mod_message(mod):
@@ -608,7 +608,7 @@ def flow_stats_entry_from_flow_mod_message(mod):
 
 
 def group_entry_from_group_mod(mod):
-    group = ofp.ofp_group_entry(
+    entry = ofp.ofp_group_entry(
         desc=ofp.ofp_group_desc(
             type=mod.type,
             group_id=mod.group_id,
@@ -619,7 +619,7 @@ def group_entry_from_group_mod(mod):
             # TODO do we need to instantiate bucket bins?
         )
     )
-    return group
+    return entry
 
 
 def mk_flow_stat(**kw):

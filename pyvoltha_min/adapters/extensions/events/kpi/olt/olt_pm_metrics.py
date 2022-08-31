@@ -175,13 +175,13 @@ class OltPmMetrics(AdapterPmMetrics):
             self.onu_metrics_config = {m: PmConfig(name=m, type=t, enabled=True)
                                        for (m, t) in self.onu_pm_names}
         else:
-            self.onu_metrics_config = dict()
+            self.onu_metrics_config = {}
 
         if self.support_gem_stats:
             self.gem_metrics_config = {m: PmConfig(name=m, type=t, enabled=True)
                                        for (m, t) in self.gem_pm_names}
         else:
-            self.gem_metrics_config = dict()
+            self.gem_metrics_config = {}
 
         self._nni_ports = kwargs.pop('nni-ports', None)
         self._pon_ports = kwargs.pop('pon-ports', None)
@@ -369,7 +369,7 @@ class OltPmMetrics(AdapterPmMetrics):
         """
         self.log.debug('entry')
         if data is None:
-            data = list()
+            data = []
 
         if group_name is None:
             group_metrics = list(self.pm_group_metrics.values())

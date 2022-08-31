@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import copy
 import structlog
 
 from twisted.internet.defer import inlineCallbacks, returnValue
@@ -37,9 +36,9 @@ class EndpointManager:
         self._replication_factor = replication_factor  # int
         self._load = load                              # float64
         self._backend = kv_backend                     # *db.Backend
-        self._services = dict()                        # map[string]*service
+        self._services = {}                            # map[string]*service
         # Device type below is Type as reported by 'voltctl adapter list'
-        self._device_type_service_map = dict()         # Device Type (str) -> map[string]string
+        self._device_type_service_map = {}             # Device Type (str) -> map[string]string
 
     @inlineCallbacks
     def get_endpoint(self, device_id, service_type):
@@ -65,7 +64,7 @@ class EndpointManager:
 
     @inlineCallbacks
     def get_all_service_endpoints(self, service_type):
-        """ Get a dict() of replica IDs -> endpoints """
+        """ Get a {} of replica IDs -> endpoints """
         log.debug('entry', service=service_type)
 
         service, _device_type = yield self._get_service_and_device_type(service_type)
@@ -111,7 +110,7 @@ class EndpointManager:
 
     @staticmethod
     def _make_key(device_id, device_type, service_type):
-        return '{}_{}_{}'.format(service_type, device_type, device_id).encode('utf-8')
+        return f'{service_type}_{device_type}_{device_id}'.encode('utf-8')
 
     @inlineCallbacks
     def _get_service_and_device_type(self, service_type):
@@ -136,7 +135,7 @@ class EndpointManager:
 
     @inlineCallbacks
     def get_device_types(self):
-        device_types = dict()
+        device_types = {}
         try:
             blobs = yield self._backend.list('device_types')
             if blobs is None:
@@ -157,7 +156,7 @@ class EndpointManager:
 
     @inlineCallbacks
     def get_adapters(self):
-        adapters = dict()
+        adapters = {}
         try:
             blobs = yield self._backend.list('adapters')
             if blobs is None:
@@ -179,7 +178,7 @@ class EndpointManager:
 
     @inlineCallbacks
     def get_devices(self):
-        devices = dict()
+        devices = {}
         try:
             blobs = yield self._backend.list('devices')
             if blobs is None:
@@ -207,8 +206,8 @@ class EndpointManager:
             log.error('backend-not-set')
             returnValue(False)
 
-        self._services = dict()
-        self._device_type_service_map = dict()
+        self._services = {}
+        self._device_type_service_map = {}
 
         # Load the adapters
         try:
@@ -319,8 +318,8 @@ class Service:
         """
         self._id = ident
         self._total_replicas = total_replicas
-        self._endpoints = dict()   # Replica ID (int) -> Endpoint (str)
-        self._member = dict()      # Key -> Member
+        self._endpoints = {}   # Replica ID (int) -> Endpoint (str)
+        self._member = {}      # Key -> Member
 
     def get_owner(self, key):
         return self._member.get(key)
@@ -343,7 +342,7 @@ class Service:
     @total_replicas.setter
     def total_replicas(self, value):
         if value < self._total_replicas:
-            raise ValueError('Invalid Total Replicas: {}, must be > {}'.format(value, self._total_replicas))
+            raise ValueError(f'Invalid Total Replicas: {value}, must be > {self._total_replicas}')
         self._total_replicas = value
 
     @property

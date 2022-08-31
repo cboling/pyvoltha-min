@@ -417,7 +417,7 @@ class IKafkaMessagingProxy:
             request.body.Pack(request_body)
             return request, transaction_id
 
-        except Exception as e:
+        except Exception as _e:
             log.exception("formatting-request-failed",
                           rpc=rpc,
                           to_topic=to_topic,
@@ -731,8 +731,7 @@ class IKafkaMessagingProxy:
                         else:
                             returnValue((response.success, None))
                 else:
-                    raise KafkaMessagingError("failed-response: rpc: {}, response {}".format(rpc,
-                                                                                             response))
+                    raise KafkaMessagingError(f"failed-response: rpc: {rpc}, response {response}")
         except TwistedTimeoutError as e:
             log.info("response-timeout", e=e, rpc=rpc)   # Initial 'Register' often times out
             if self.tx_stats:
@@ -786,7 +785,7 @@ class IKafkaMessagingProxy:
                     rpc = IA_MSG_ENUM.values_by_number[msg_type].name
 
                 except Exception as _e:
-                    rpc = 'msg-type-{}'.format(msg_type)
+                    rpc = f'msg-type-{msg_type}'
 
             span_name += 'async-rpc-' if is_async else 'rpc-'
             span_name += rpc
@@ -801,7 +800,7 @@ class IKafkaMessagingProxy:
 
             span_to_inject.set_baggage_item('rpc-span-name', span_name)
 
-            text_map = dict()
+            text_map = {}
             tracer.inject(span_to_inject, Format.TEXT_MAP, text_map)
             text_map_json = json.dumps(text_map, indent=None, separators=(',', ':'))
             span_arg = StrType(val=text_map_json)
@@ -853,7 +852,7 @@ class IKafkaMessagingProxy:
                         rpc_name = IA_MSG_ENUM.values_by_number[msg_type].name
 
                     except Exception as _e:
-                        rpc_name = 'msg-type-{}'.format(msg_type)
+                        rpc_name = f'msg-type-{msg_type}'
                     break
 
         span_name += 'rpc-' + rpc_name

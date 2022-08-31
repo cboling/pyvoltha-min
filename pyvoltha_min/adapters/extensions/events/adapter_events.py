@@ -69,8 +69,7 @@ class AdapterEvents:
 
         :return: (str) Event ID
         """
-        return 'voltha.{}.{}.{}'.format(self.adapter_name,
-                                        self.device_id, event)
+        return f'voltha.{self.adapter_name}.{self.device_id}.{event}'
 
     def get_event_header(self, _type, category, sub_category, event, raised_ts):
         """
@@ -181,9 +180,9 @@ class DeviceEventBase:
         }.get(status)
 
         if state is None:
-            raise TypeError('status should be an AdapterEventStatus enumeration:{}'.format(status))
+            raise TypeError(f'status should be an AdapterEventStatus enumeration:{status}')
 
-        return '{} Event - {} - {}'.format(object_type.upper(), device_event.upper(), state)
+        return '{object_type.upper()} Event - {device_event.upper()} - {state}'
 
     def _get_device_event_data(self, status):
         """
@@ -204,7 +203,7 @@ class DeviceEventBase:
         current_context["serial-number"] = self.event_mgr.serial_number
 
         return DeviceEvent(resource_id=self.event_mgr.device_id,
-                           device_event_name="{}_{}".format(self._event, status.name),
+                           device_event_name=f"{self._event}_{status.name}",
                            description=self._format_description(self._object_type, self._event, status),
                            context=current_context)
 

@@ -52,7 +52,7 @@ class IAdapter:
                  total_replicas=1,
                  adapter_type=None):
         log.debug(
-            'Initializing adapter: {} {} {}'.format(vendor, name, version))
+            f'Initializing adapter: {vendor} {name} {version}')
         self.core_proxy = core_proxy
         self.adapter_proxy = adapter_proxy
         self.config = config
@@ -76,14 +76,14 @@ class IAdapter:
             endpoint=endpoint,
             type=adapter_type or name
         )
-        self.devices_handlers = dict()  # device_id -> Olt/OnuHandler()
+        self.devices_handlers = {}  # device_id -> Olt/OnuHandler()
         self.device_handler_class = device_handler_class
 
     def start(self):
-        log.info('Starting adapter: {}'.format(self.name))
+        log.info(f'Starting adapter: {self.name}')
 
     def stop(self):
-        log.info('Stopping adapter: {}'.format(self.name))
+        log.info(f'Stopping adapter: {self.name}')
 
     def adapter_descriptor(self):
         return self.descriptor
@@ -228,6 +228,9 @@ class IAdapter:
     def process_inter_adapter_message(self, msg, from_topic=None):
         raise NotImplementedError()
 
+    def process_tech_profile_instance_request(self, msg):
+        raise NotImplementedError()
+
     def receive_packet_out(self, device_id, egress_port_no, msg):
         raise NotImplementedError()
 
@@ -241,6 +244,24 @@ class IAdapter:
         raise NotImplementedError()
 
     def single_set_value_request(self, request):
+        raise NotImplementedError()
+
+    def download_onu_image(self, request):
+        raise NotImplementedError()
+
+    def get_onu_image_status(self, request):
+        raise NotImplementedError()
+
+    def abort_onu_image_upgrade(self, request):
+        raise NotImplementedError()
+
+    def get_onu_images(self, request):
+        raise NotImplementedError()
+
+    def activate_onu_image(self, request):
+        raise NotImplementedError()
+
+    def commit_onu_image(self, request):
         raise NotImplementedError()
 
     def _get_handler(self, device):
@@ -287,7 +308,7 @@ class OltAdapter(IAdapter):
                          current_replica=current_replica,
                          total_replicas=total_replicas,
                          adapter_type=adapter_type)
-        self.logical_device_id_to_root_device_id = dict()
+        self.logical_device_id_to_root_device_id = {}
 
     def reconcile_device(self, device):
         try:
@@ -326,6 +347,20 @@ class OltAdapter(IAdapter):
             handler = self.devices_handlers[msg.header.to_device_id]
         if handler:
             reactor.callLater(0, handler.process_inter_adapter_message, msg, from_topic=from_topic)
+
+    def process_tech_profile_instance_request(self, msg):
+        log.debug('process-tech-profile-instance-request', msg=msg)
+        # Unpack the header to know which device needs to handle this message
+        handler = None
+        if msg.header.proxy_device_id:
+            # typical request
+            handler = self.devices_handlers[msg.header.proxy_device_id]
+        elif msg.header.to_device_id and \
+                msg.header.to_device_id in self.devices_handlers:
+            # typical response
+            handler = self.devices_handlers[msg.header.to_device_id]
+        if handler:
+            reactor.callLater(0, handler.process_tech_profile_instance_request, msg)
 
     def receive_packet_out(self, device_id, egress_port_no, msg):
         try:

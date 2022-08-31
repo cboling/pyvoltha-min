@@ -31,8 +31,7 @@ class DeferredWithTimeout(Deferred):
         self._timer = reactor.callLater(timeout, self.timed_out)
 
     def timed_out(self):
-        self.errback(TwistedTimeoutErrorDefer('timed out after {} seconds'.
-                                              format(self._timeout)))
+        self.errback(TwistedTimeoutErrorDefer(f'timed out after {self._timeout} seconds'))
 
     def callback(self, result):
         self._cancel_timer()

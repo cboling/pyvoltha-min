@@ -14,16 +14,15 @@
 # limitations under the License.
 #
 import structlog
+from jaeger_client import Config
+from jaeger_client.constants import SAMPLER_TYPE_CONST
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, returnValue
 
-from jaeger_client import Config
-from jaeger_client.constants import SAMPLER_TYPE_CONST
-
+from pyvoltha_min.adapters.log_features import GlobalTracingSupport
+from pyvoltha_min.common.config.kvstore_prefix import KvStore
 from pyvoltha_min.common.config.twisted_etcd_store import TwistedEtcdStore, DEFAULT_KVSTORE_TIMEOUT
 from pyvoltha_min.common.structlog_setup import string_to_int
-from pyvoltha_min.common.config.kvstore_prefix import KvStore
-from pyvoltha_min.adapters.log_features import GlobalTracingSupport
 
 GLOBAL_CONFIG_ROOT_NODE = "global"
 DEFAULT_KV_STORE_CONFIG_PATH = "config"
@@ -127,7 +126,7 @@ class LogController:
 
     @inlineCallbacks
     def get_log_features(self):
-        features = dict()
+        features = {}
         try:
             features_info = yield self._etcd_client.get(self.feature_path)
             if features_info is not None:

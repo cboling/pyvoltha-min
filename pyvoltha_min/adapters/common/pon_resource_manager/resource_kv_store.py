@@ -55,7 +55,7 @@ class ResourceKvStore:
 
     @staticmethod
     def path_prefix(technology):
-        return KvStore.prefix + '/resource_manager/{}'.format(technology)
+        return KvStore.prefix + f'/resource_manager/{technology}'
 
     def update_to_kv_store(self, path, resource):
         """

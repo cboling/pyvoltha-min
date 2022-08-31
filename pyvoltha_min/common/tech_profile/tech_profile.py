@@ -15,18 +15,18 @@
 #
 # pylint: disable=too-few-public-methods, too-many-arguments, import-error
 
-import re
 import json
+import re
 from collections import namedtuple
 from enum import Enum
 
 import structlog
 from voltha_protos import openolt_pb2
 
-#from pyvoltha_min.common.config.twisted_etcd_store import TwistedEtcdStore as EtcdStore
+# from pyvoltha_min.common.config.twisted_etcd_store import TwistedEtcdStore as EtcdStore
 from pyvoltha_min.common.config.config_backend import EtcdStore
-from pyvoltha_min.common.utils.registry import registry
 from pyvoltha_min.common.config.kvstore_prefix import KvStore
+from pyvoltha_min.common.utils.registry import registry
 
 # logger
 log = structlog.get_logger()
@@ -222,7 +222,7 @@ class TechProfile:
 
     # Tech profile path prefix in kv store
     kv_store_prefix = KvStore.prefix
-    KV_STORE_TECH_PROFILE_PATH_PREFIX = '%s/technology_profiles' % kv_store_prefix
+    KV_STORE_TECH_PROFILE_PATH_PREFIX = f'{kv_store_prefix}/technology_profiles'
 
     # Tech profile path in kv store
     TECH_PROFILE_PATH = '{}/{}'  # <technology>/<table_id>
@@ -369,8 +369,8 @@ class TechProfile:
         the technology profile ID was not found in the kv-store.  It provides a very minimal
         single-tcont/gem-port service
         """
-        upstream_gem_port_attribute_list = list()
-        downstream_gem_port_attribute_list = list()
+        upstream_gem_port_attribute_list = []
+        downstream_gem_port_attribute_list = []
         for pbit in TechProfile.pbits:
             upstream_gem_port_attribute_list.append(
                 GemPortAttribute(pbit_map=pbit,
@@ -398,7 +398,7 @@ class TechProfile:
         This is often use to unmarshal saved JSON from the kv-store for a tech profile.
         """
         if not isinstance(tech_profile, dict):
-            raise TypeError('A dictionary was expected, received a {}'.format(type(tech_profile)))
+            raise TypeError(f'A dictionary was expected, received a {type(tech_profile)}')
 
         # Tech profile fetched from kv store
         instance_control = tech_profile[TechProfile.INSTANCE_CONTROL]
@@ -425,8 +425,8 @@ class TechProfile:
                                  q_sched_policy=ds_scheduler[
                                      TechProfile.Q_SCHED_POLICY])
 
-        upstream_gem_port_attribute_list = list()
-        downstream_gem_port_attribute_list = list()
+        upstream_gem_port_attribute_list = []
+        downstream_gem_port_attribute_list = []
         us_gemport_attr_list = tech_profile[TechProfile.UPSTREAM_GEM_PORT_ATTRIBUTE_LIST]
 
         for attr in us_gemport_attr_list:
@@ -610,8 +610,8 @@ class TechProfileInstance:
         self.us_scheduler = None
         self.ds_scheduler = None
 
-        self.upstream_gem_port_attribute_list = list()
-        self.downstream_gem_port_attribute_list = list()
+        self.upstream_gem_port_attribute_list = []
+        self.downstream_gem_port_attribute_list = []
 
     @staticmethod
     def create(subscriber_identifier, tech_profile, resource_mgr, intf_id, tp_path, kv_store):
@@ -654,7 +654,7 @@ class TechProfileInstance:
             gemport_list = list(gem_ports)
 
         else:
-            raise ValueError("invalid GEM Port type: '{}'".format(type(gem_ports)))
+            raise ValueError(f"invalid GEM Port type: '{type(gem_ports)}'")
 
         # Assign the allocated resources
         return tp_instance.assign_resources(tech_profile, alloc_id, gemport_list)
@@ -681,7 +681,7 @@ class TechProfileInstance:
         self.us_scheduler = TechProfileInstance.IScheduler(alloc_id, tech_profile.us_scheduler)
         self.ds_scheduler = TechProfileInstance.IScheduler(None, tech_profile.ds_scheduler)
 
-        mcast_gem_port_attribute_list = list()
+        mcast_gem_port_attribute_list = []
 
         for idx in range(self.num_gem_ports):
             # Add upstream GEM Ports

@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import threading
 import functools
-import structlog
+import threading
 
-from twisted.internet import defer
-from opentracing import global_tracer, tags, follows_from
+import structlog
 from jaeger_client import Span as JaegerSpan, SpanContext as JaegerSpanContext
 from jaeger_client.thrift_gen.jaeger.ttypes import TagType
+from opentracing import global_tracer, tags, follows_from
+from twisted.internet import defer
 
 from pyvoltha_min.adapters.log_features import GlobalTracingSupport
 
@@ -147,10 +147,10 @@ def extract_context_attributes():
         span.set_baggage_item(ROOT_SPAN_KEY_NAME, task_name)
         op_name = task_name
 
-    fields = {'op-id': '{:016x}'.format(op_id), 'op-name': op_name}
+    fields = {'op-id': f'{op_id:016x}', 'op-name': op_name}
 
     if task_id != op_id:
-        fields['task-id'] = '{:016x}'.format(task_id)
+        fields['task-id'] = f'{task_id:016x}'
         fields['task-name'] = task_name
 
     try:

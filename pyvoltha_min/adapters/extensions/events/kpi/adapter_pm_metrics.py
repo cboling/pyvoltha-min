@@ -67,8 +67,8 @@ class AdapterPmMetrics:
         self._sub_category = kwargs.get('subcategory', EventSubCategory.OLT)
         self.grouped = grouped
         self.freq_override = grouped and freq_override
-        self.pm_group_metrics = dict()      # name -> PmGroupConfig
-        self.lp_callbacks = dict()          # name -> LoopingCallback
+        self.pm_group_metrics = {}      # name -> PmGroupConfig
+        self.lp_callbacks = {}          # name -> LoopingCallback
         self.max_skew = max_skew
 
     def update(self, pm_config):
@@ -131,8 +131,8 @@ class AdapterPmMetrics:
         if group is None:
             return None
 
-        metrics = dict()
-        context = dict()
+        metrics = {}
+        context = {}
 
         now = getattr(group, AdapterPmMetrics.TIMESTAMP_ATTRIBUTE) \
             if hasattr(group, AdapterPmMetrics.TIMESTAMP_ATTRIBUTE) \

@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import structlog
 import etcd3
-import etcd3.utils as utils
-
+import structlog
+from etcd3.utils import increment_last_byte, to_bytes
 from twisted.internet import threads
 from twisted.internet.defer import CancelledError, inlineCallbacks, returnValue
 from twisted.python.failure import Failure
@@ -34,14 +33,13 @@ class TwistedEtcdStore:
         self._default_retries = default_retries
         self._timeout = timeout
 
-        self.log = structlog.get_logger(client='{}:{}'.format(self._host, self._port))
+        self.log = structlog.get_logger(client=f'{self._host}:{self._port}')
         # TODO: Before deprecating the blocking 'EtcdStore' class, add support
         #       for retries. Specifically look for a failed connection where a
         #       a new client needs to be added.
 
     def __str__(self):
-        return 'etcd-{}:{}/{}, Timeout: {}'.format(self._host, self._port,
-                                                   self._path_prefix, self._timeout)
+        return f'etcd-{self._host}:{self._port}/{self._path_prefix}, Timeout: {self._timeout}'
 
     @property
     def host(self):
@@ -80,14 +78,14 @@ class TwistedEtcdStore:
     def make_path(self, key):
         if key is None:
             return self._path_prefix
-        return '{}/{}'.format(self._path_prefix, key)
+        return f'{self._path_prefix}/{key}'
 
     def _failure(self, reason, key, operation, retries):
         """ Common error handler """
         if isinstance(reason, Failure) and issubclass(type(reason.value), CancelledError):
-            self.log.debug('{}-cancelled'.format(operation))
+            self.log.debug(f'{operation}-cancelled')
         else:
-            self.log.info('{}-failure'.format(operation), error=reason, key=key)
+            self.log.info(f'{operation}-failure', error=reason, key=key)
 
             if retries:
                 # TODO: Need to retry and set up *args, **kwargs appropriately
@@ -145,7 +143,7 @@ class TwistedEtcdStore:
 
         path = self.make_path(key)
         if watch_prefix:
-            kwargs = dict(range_end=utils.increment_last_byte(utils.to_bytes(path)))
+            kwargs = dict(range_end=increment_last_byte(to_bytes(path)))
             deferred = threads.deferToThread(self._etcd.add_watch_callback, path, callback, **kwargs)
         else:
             deferred = threads.deferToThread(self._etcd.add_watch_callback, path, callback)
@@ -158,7 +156,7 @@ class TwistedEtcdStore:
         self.log.debug('entry', key=key)
 
         if key is None or len(key) == 0:
-            raise ValueError("key-not-provided: '{}'".format(key))
+            raise ValueError(f"key-not-provided: '{key}'")
 
         def success(results, k):
             self.log.debug('delete-success', results=results, key=k)
