@@ -38,14 +38,17 @@ class _LogFeatures:
         if not isinstance(value, bool):
             raise TypeError('Boolean required')
 
-        if value != self._log_correlation_enabled:
-            # Close any previous tracer and reopen if required
-            tracer = global_tracer()
-            if hasattr(tracer, 'close'):
-                tracer.close()
-
-            self._log_correlation_enabled = value
-            self._log_controller.enable_jaeger_client()
+        # CB: 2022-09-21: Disabling tracing during transition phase of using the latest Twisted
+        #                 releases and asyncio as the base reactor. Once this is complete, a
+        #                 new major version of pyvoltha-min will be created with tracing re-enabled.
+        # if value != self._log_correlation_enabled:
+        #     # Close any previous tracer and reopen if required
+        #     tracer = global_tracer()
+        #     if hasattr(tracer, 'close'):
+        #         tracer.close()
+        #
+        #     self._log_correlation_enabled = value
+        #     self._log_controller.enable_jaeger_client()
 
     @property
     def trace_publishing_status(self):
@@ -56,14 +59,17 @@ class _LogFeatures:
         if not isinstance(value, bool):
             raise TypeError('Boolean required')
 
-        if value != self._trace_publishing_enabled:
-            # Close any previous tracer and reopen if required
-            tracer = global_tracer()
-            if hasattr(tracer, 'close'):
-                tracer.close()
-
-            self._trace_publishing_enabled = value
-            self._log_controller.enable_jaeger_client()
+        # CB: 2022-09-21: Disabling tracing during transition phase of using the latest Twisted
+        #                 releases and asyncio as the base reactor. Once this is complete, a
+        #                 new major version of pyvoltha-min will be created with tracing re-enabled.
+        # if value != self._trace_publishing_enabled:
+        #     # Close any previous tracer and reopen if required
+        #     tracer = global_tracer()
+        #     if hasattr(tracer, 'close'):
+        #         tracer.close()
+        #
+        #     self._trace_publishing_enabled = value
+        #     self._log_controller.enable_jaeger_client()
 
     @property
     def component_name(self):
@@ -88,10 +94,16 @@ class _LogFeatures:
         self._component_name = config.get('component_name', os.environ.get('COMPONENT_NAME',
                                                                            'unknown-olt'))
         self.scope_manager = scope_manager
-        # Set trace/log correlation directly.  During initial startup, we want to start the
-        # OpenTracing client at the end of our init and not from the property setter functions.
-        self._trace_publishing_enabled = config.get('trace_enabled')
-        self._log_correlation_enabled = config.get('log_correlation_enabled')
+        # CB: 2022-09-21: Disabling tracing during transition phase of using the latest Twisted
+        #                 releases and asyncio as the base reactor. Once this is complete, a
+        #                 new major version of pyvoltha-min will be created with tracing re-enabled.
+        self._trace_publishing_enabled = False
+        self._log_correlation_enabled = False
+
+        # # Set trace/log correlation directly.  During initial startup, we want to start the
+        # # OpenTracing client at the end of our init and not from the property setter functions.
+        # self._trace_publishing_enabled = config.get('trace_enabled')
+        # self._log_correlation_enabled = config.get('log_correlation_enabled')
 
 
 GlobalTracingSupport = _LogFeatures()

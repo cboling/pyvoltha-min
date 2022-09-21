@@ -58,8 +58,11 @@ class LogController:
         self._global_log_level = GLOBAL_DEFAULT_LOGLEVEL
         self._watch_callback = watch_callback
 
-        # Reference
-        GlobalTracingSupport.set_log_controller(self, scope_manager, config)
+        # CB: 2022-09-21: Disabling tracing during transition phase of using the latest Twisted
+        #                 releases and asyncio as the base reactor. Once this is complete, a
+        #                 new major version of pyvoltha-min will be created with tracing re-enabled
+        # # Reference
+        # GlobalTracingSupport.set_log_controller(self, scope_manager, config)
 
     @staticmethod
     def make_component_path(component):
@@ -254,8 +257,14 @@ class LogController:
             # Return none always
 
     def enable_jaeger_client(self):
-        log_correlation_enabled = GlobalTracingSupport.log_correlation_status
-        tracing_enabled = GlobalTracingSupport.trace_publishing_status
+
+        # CB: 2022-09-21: Disabling tracing during transition phase of using the latest Twisted
+        #                 releases and asyncio as the base reactor. Once this is complete, a
+        #                 new major version of pyvoltha-min will be created with tracing re-enabled.
+        log_correlation_enabled = False
+        tracing_enabled = False
+        # log_correlation_enabled = GlobalTracingSupport.log_correlation_status
+        # tracing_enabled = GlobalTracingSupport.trace_publishing_status
 
         if tracing_enabled or log_correlation_enabled:
             # The following are available 'config' dictionary options

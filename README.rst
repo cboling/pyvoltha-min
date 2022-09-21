@@ -29,10 +29,16 @@ Installation instruction
 
 .. code:: bash
 
-   pip install pyvoltha-min
+   python -m pip install pyvoltha-min
 
 Release Notes
 -------------
+v2.8.1 (2022-09-21)
+^^^^^^^^^^^^^^^^^^^
+ - Disabling opentracing/log-correlation in order to eventually upgrade to latest
+   twisted release and base off asyncio reactor for twisted.
+ - Moving minimum python version to 3.8
+
 v2.8.0 (2022-02-01)
 ^^^^^^^^^^^^^^^^^^^
  - Pull in v2.8 (release) voltha-protos definitions and python generated code and

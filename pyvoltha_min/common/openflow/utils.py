@@ -16,97 +16,97 @@
 from hashlib import md5
 
 import structlog
-from voltha_protos import openflow_13_pb2 as ofp
+from voltha_protos import openflow_13_pb2 as voltha__protos_dot_openflow__13__pb2
 
 log = structlog.get_logger()
 
 # aliases
-ofb_field = ofp.ofp_oxm_ofb_field
-action = ofp.ofp_action
+ofb_field = voltha__protos_dot_openflow__13__pb2.ofp_oxm_ofb_field
+action = voltha__protos_dot_openflow__13__pb2.ofp_action
 
 # OFPAT_* shortcuts
-OUTPUT = ofp.OFPAT_OUTPUT
-COPY_TTL_OUT = ofp.OFPAT_COPY_TTL_OUT
-COPY_TTL_IN = ofp.OFPAT_COPY_TTL_IN
-SET_MPLS_TTL = ofp.OFPAT_SET_MPLS_TTL
-DEC_MPLS_TTL = ofp.OFPAT_DEC_MPLS_TTL
-PUSH_VLAN = ofp.OFPAT_PUSH_VLAN
-POP_VLAN = ofp.OFPAT_POP_VLAN
-PUSH_MPLS = ofp.OFPAT_PUSH_MPLS
-POP_MPLS = ofp.OFPAT_POP_MPLS
-SET_QUEUE = ofp.OFPAT_SET_QUEUE
-GROUP = ofp.OFPAT_GROUP
-SET_NW_TTL = ofp.OFPAT_SET_NW_TTL
-NW_TTL = ofp.OFPAT_DEC_NW_TTL
-SET_FIELD = ofp.OFPAT_SET_FIELD
-PUSH_PBB = ofp.OFPAT_PUSH_PBB
-POP_PBB = ofp.OFPAT_POP_PBB
-EXPERIMENTER = ofp.OFPAT_EXPERIMENTER
+OUTPUT = voltha__protos_dot_openflow__13__pb2.OFPAT_OUTPUT
+COPY_TTL_OUT = voltha__protos_dot_openflow__13__pb2.OFPAT_COPY_TTL_OUT
+COPY_TTL_IN = voltha__protos_dot_openflow__13__pb2.OFPAT_COPY_TTL_IN
+SET_MPLS_TTL = voltha__protos_dot_openflow__13__pb2.OFPAT_SET_MPLS_TTL
+DEC_MPLS_TTL = voltha__protos_dot_openflow__13__pb2.OFPAT_DEC_MPLS_TTL
+PUSH_VLAN = voltha__protos_dot_openflow__13__pb2.OFPAT_PUSH_VLAN
+POP_VLAN = voltha__protos_dot_openflow__13__pb2.OFPAT_POP_VLAN
+PUSH_MPLS = voltha__protos_dot_openflow__13__pb2.OFPAT_PUSH_MPLS
+POP_MPLS = voltha__protos_dot_openflow__13__pb2.OFPAT_POP_MPLS
+SET_QUEUE = voltha__protos_dot_openflow__13__pb2.OFPAT_SET_QUEUE
+GROUP = voltha__protos_dot_openflow__13__pb2.OFPAT_GROUP
+SET_NW_TTL = voltha__protos_dot_openflow__13__pb2.OFPAT_SET_NW_TTL
+NW_TTL = voltha__protos_dot_openflow__13__pb2.OFPAT_DEC_NW_TTL
+SET_FIELD = voltha__protos_dot_openflow__13__pb2.OFPAT_SET_FIELD
+PUSH_PBB = voltha__protos_dot_openflow__13__pb2.OFPAT_PUSH_PBB
+POP_PBB = voltha__protos_dot_openflow__13__pb2.OFPAT_POP_PBB
+EXPERIMENTER = voltha__protos_dot_openflow__13__pb2.OFPAT_EXPERIMENTER
 
 # OFPXMT_OFB_* shortcuts (incomplete)
-IN_PORT = ofp.OFPXMT_OFB_IN_PORT
-IN_PHY_PORT = ofp.OFPXMT_OFB_IN_PHY_PORT
-METADATA = ofp.OFPXMT_OFB_METADATA
-ETH_DST = ofp.OFPXMT_OFB_ETH_DST
-ETH_SRC = ofp.OFPXMT_OFB_ETH_SRC
-ETH_TYPE = ofp.OFPXMT_OFB_ETH_TYPE
-VLAN_VID = ofp.OFPXMT_OFB_VLAN_VID
-VLAN_PCP = ofp.OFPXMT_OFB_VLAN_PCP
-IP_DSCP = ofp.OFPXMT_OFB_IP_DSCP
-IP_ECN = ofp.OFPXMT_OFB_IP_ECN
-IP_PROTO = ofp.OFPXMT_OFB_IP_PROTO
-IPV4_SRC = ofp.OFPXMT_OFB_IPV4_SRC
-IPV4_DST = ofp.OFPXMT_OFB_IPV4_DST
-TCP_SRC = ofp.OFPXMT_OFB_TCP_SRC
-TCP_DST = ofp.OFPXMT_OFB_TCP_DST
-UDP_SRC = ofp.OFPXMT_OFB_UDP_SRC
-UDP_DST = ofp.OFPXMT_OFB_UDP_DST
-SCTP_SRC = ofp.OFPXMT_OFB_SCTP_SRC
-SCTP_DST = ofp.OFPXMT_OFB_SCTP_DST
-ICMPV4_TYPE = ofp.OFPXMT_OFB_ICMPV4_TYPE
-ICMPV4_CODE = ofp.OFPXMT_OFB_ICMPV4_CODE
-ARP_OP = ofp.OFPXMT_OFB_ARP_OP
-ARP_SPA = ofp.OFPXMT_OFB_ARP_SPA
-ARP_TPA = ofp.OFPXMT_OFB_ARP_TPA
-ARP_SHA = ofp.OFPXMT_OFB_ARP_SHA
-ARP_THA = ofp.OFPXMT_OFB_ARP_THA
-IPV6_SRC = ofp.OFPXMT_OFB_IPV6_SRC
-IPV6_DST = ofp.OFPXMT_OFB_IPV6_DST
-IPV6_FLABEL = ofp.OFPXMT_OFB_IPV6_FLABEL
-ICMPV6_TYPE = ofp.OFPXMT_OFB_ICMPV6_TYPE
-ICMPV6_CODE = ofp.OFPXMT_OFB_ICMPV6_CODE
-IPV6_ND_TARGET = ofp.OFPXMT_OFB_IPV6_ND_TARGET
-OFB_IPV6_ND_SLL = ofp.OFPXMT_OFB_IPV6_ND_SLL
-IPV6_ND_TLL = ofp.OFPXMT_OFB_IPV6_ND_TLL
-MPLS_LABEL = ofp.OFPXMT_OFB_MPLS_LABEL
-MPLS_TC = ofp.OFPXMT_OFB_MPLS_TC
-MPLS_BOS = ofp.OFPXMT_OFB_MPLS_BOS
-PBB_ISID = ofp.OFPXMT_OFB_PBB_ISID
-TUNNEL_ID = ofp.OFPXMT_OFB_TUNNEL_ID
-IPV6_EXTHDR = ofp.OFPXMT_OFB_IPV6_EXTHDR
+IN_PORT = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_IN_PORT
+IN_PHY_PORT = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_IN_PHY_PORT
+METADATA = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_METADATA
+ETH_DST = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_ETH_DST
+ETH_SRC = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_ETH_SRC
+ETH_TYPE = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_ETH_TYPE
+VLAN_VID = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_VLAN_VID
+VLAN_PCP = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_VLAN_PCP
+IP_DSCP = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_IP_DSCP
+IP_ECN = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_IP_ECN
+IP_PROTO = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_IP_PROTO
+IPV4_SRC = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_IPV4_SRC
+IPV4_DST = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_IPV4_DST
+TCP_SRC = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_TCP_SRC
+TCP_DST = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_TCP_DST
+UDP_SRC = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_UDP_SRC
+UDP_DST = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_UDP_DST
+SCTP_SRC = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_SCTP_SRC
+SCTP_DST = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_SCTP_DST
+ICMPV4_TYPE = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_ICMPV4_TYPE
+ICMPV4_CODE = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_ICMPV4_CODE
+ARP_OP = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_ARP_OP
+ARP_SPA = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_ARP_SPA
+ARP_TPA = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_ARP_TPA
+ARP_SHA = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_ARP_SHA
+ARP_THA = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_ARP_THA
+IPV6_SRC = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_IPV6_SRC
+IPV6_DST = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_IPV6_DST
+IPV6_FLABEL = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_IPV6_FLABEL
+ICMPV6_TYPE = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_ICMPV6_TYPE
+ICMPV6_CODE = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_ICMPV6_CODE
+IPV6_ND_TARGET = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_IPV6_ND_TARGET
+OFB_IPV6_ND_SLL = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_IPV6_ND_SLL
+IPV6_ND_TLL = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_IPV6_ND_TLL
+MPLS_LABEL = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_MPLS_LABEL
+MPLS_TC = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_MPLS_TC
+MPLS_BOS = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_MPLS_BOS
+PBB_ISID = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_PBB_ISID
+TUNNEL_ID = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_TUNNEL_ID
+IPV6_EXTHDR = voltha__protos_dot_openflow__13__pb2.OFPXMT_OFB_IPV6_EXTHDR
 IPV4_DHCP_SRC_PORT = 68
 IPV6_DHCP_SRC_PORT = 546
 
 # ofp_action_* shortcuts
 
-def output(port, max_len=ofp.OFPCML_MAX):
+def output(port, max_len=voltha__protos_dot_openflow__13__pb2.OFPCML_MAX):
     return action(
         type=OUTPUT,
-        output=ofp.ofp_action_output(port=port, max_len=max_len)
+        output=voltha__protos_dot_openflow__13__pb2.ofp_action_output(port=port, max_len=max_len)
     )
 
 
 def mpls_ttl(ttl):
     return action(
         type=SET_MPLS_TTL,
-        mpls_ttl=ofp.ofp_action_mpls_ttl(mpls_ttl=ttl)
+        mpls_ttl=voltha__protos_dot_openflow__13__pb2.ofp_action_mpls_ttl(mpls_ttl=ttl)
     )
 
 
 def push_vlan(e_type):
     return action(
         type=PUSH_VLAN,
-        push=ofp.ofp_action_push(ethertype=e_type)
+        push=voltha__protos_dot_openflow__13__pb2.ofp_action_push(ethertype=e_type)
     )
 
 
@@ -119,30 +119,30 @@ def pop_vlan():
 def pop_mpls(e_type):
     return action(
         type=POP_MPLS,
-        pop_mpls=ofp.ofp_action_pop_mpls(ethertype=e_type)
+        pop_mpls=voltha__protos_dot_openflow__13__pb2.ofp_action_pop_mpls(ethertype=e_type)
     )
 
 
 def group(group_id):
     return action(
         type=GROUP,
-        group=ofp.ofp_action_group(group_id=group_id)
+        group=voltha__protos_dot_openflow__13__pb2.ofp_action_group(group_id=group_id)
     )
 
 
 def nw_ttl(ttl):
     return action(
         type=NW_TTL,
-        nw_ttl=ofp.ofp_action_nw_ttl(nw_ttl=ttl)
+        nw_ttl=voltha__protos_dot_openflow__13__pb2.ofp_action_nw_ttl(nw_ttl=ttl)
     )
 
 
 def set_field(field):
     return action(
         type=SET_FIELD,
-        set_field=ofp.ofp_action_set_field(
-            field=ofp.ofp_oxm_field(
-                oxm_class=ofp.OFPXMC_OPENFLOW_BASIC,
+        set_field=voltha__protos_dot_openflow__13__pb2.ofp_action_set_field(
+            field=voltha__protos_dot_openflow__13__pb2.ofp_oxm_field(
+                oxm_class=voltha__protos_dot_openflow__13__pb2.OFPXMC_OPENFLOW_BASIC,
                 ofb_field=field))
     )
 
@@ -150,7 +150,7 @@ def set_field(field):
 def experimenter(experimenter_val, data):
     return action(
         type=EXPERIMENTER,
-        experimenter=ofp.ofp_action_experimenter(
+        experimenter=voltha__protos_dot_openflow__13__pb2.ofp_action_experimenter(
             experimenter=experimenter_val, data=data)
     )
 
@@ -321,7 +321,7 @@ def ipv6_exthdr(_ipv6_exthdr):
 
 def get_metadata_from_write_metadata(flow):
     for instruction in flow.instructions:
-        if instruction.type == ofp.OFPIT_WRITE_METADATA:
+        if instruction.type == voltha__protos_dot_openflow__13__pb2.OFPIT_WRITE_METADATA:
             return instruction.write_metadata.metadata
     return None
 
@@ -349,10 +349,10 @@ def get_inner_tag_from_write_metadata(flow):
 
 def get_actions(flow):
     """Extract list of ofp_action objects from flow spec object"""
-    # assert isinstance(flow, ofp.ofp_flow_stats)
+    # assert isinstance(flow, voltha__protos_dot_openflow__13__pb2.ofp_flow_stats)
     # we have the following hard assumptions for now
     for instruction in flow.instructions:
-        if instruction.type == ofp.OFPIT_APPLY_ACTIONS:
+        if instruction.type == voltha__protos_dot_openflow__13__pb2.OFPIT_APPLY_ACTIONS:
             return instruction.actions.actions
     return None
 
@@ -365,18 +365,18 @@ def get_default_vlan(flow):
 
 
 def get_ofb_fields(flow):
-    # assert isinstance(flow, ofp.ofp_flow_stats)
-    # assert flow.match.type == ofp.OFPMT_OXM
+    # assert isinstance(flow, voltha__protos_dot_openflow__13__pb2.ofp_flow_stats)
+    # assert flow.match.type == voltha__protos_dot_openflow__13__pb2.OFPMT_OXM
     ofb_fields = []
     for field in flow.match.oxm_fields:
-        # assert field.oxm_class == ofp.OFPXMC_OPENFLOW_BASIC
+        # assert field.oxm_class == voltha__protos_dot_openflow__13__pb2.OFPXMC_OPENFLOW_BASIC
         ofb_fields.append(field.ofb_field)
     return ofb_fields
 
 
 def get_meter_id_from_flow(flow):
     for instruction in flow.instructions:
-        if instruction.type == ofp.OFPIT_METER:
+        if instruction.type == voltha__protos_dot_openflow__13__pb2.OFPIT_METER:
             return instruction.meter.meter_id
     return None
 
@@ -397,13 +397,13 @@ def get_in_port(flow):
 
 def get_goto_table_id(flow):
     for instruction in flow.instructions:
-        if instruction.type == ofp.OFPIT_GOTO_TABLE:
+        if instruction.type == voltha__protos_dot_openflow__13__pb2.OFPIT_GOTO_TABLE:
             return instruction.goto_table.table_id
     return None
 
 def get_write_metadata(flow):
     for instruction in flow.instructions:
-        if instruction.type == ofp.OFPIT_WRITE_METADATA:
+        if instruction.type == voltha__protos_dot_openflow__13__pb2.OFPIT_WRITE_METADATA:
             return instruction.write_metadata.metadata
     return None
 
@@ -510,8 +510,8 @@ def has_group(flow):
 
 def mk_oxm_fields(match_fields):
     oxm_fields = [
-        ofp.ofp_oxm_field(
-            oxm_class=ofp.OFPXMC_OPENFLOW_BASIC,
+        voltha__protos_dot_openflow__13__pb2.ofp_oxm_field(
+            oxm_class=voltha__protos_dot_openflow__13__pb2.OFPXMC_OPENFLOW_BASIC,
             ofb_field=field
         ) for field in match_fields
     ]
@@ -520,14 +520,14 @@ def mk_oxm_fields(match_fields):
 
 
 def mk_instructions_from_actions(actions):
-    instructions_action = ofp.ofp_instruction_actions()
+    instructions_action = voltha__protos_dot_openflow__13__pb2.ofp_instruction_actions()
     instructions_action.actions.extend(actions)
-    instruction = ofp.ofp_instruction(type=ofp.OFPIT_APPLY_ACTIONS,
+    instruction = voltha__protos_dot_openflow__13__pb2.ofp_instruction(type=voltha__protos_dot_openflow__13__pb2.OFPIT_APPLY_ACTIONS,
                                       actions=instructions_action)
     return [instruction]
 
 
-def mk_simple_flow_mod(match_fields, actions, command=ofp.OFPFC_ADD,
+def mk_simple_flow_mod(match_fields, actions, command=voltha__protos_dot_openflow__13__pb2.OFPFC_ADD,
                        next_table_id=None, **kw):
     """
     Convenience function to generare ofp_flow_mod message with OXM BASIC match
@@ -540,24 +540,24 @@ def mk_simple_flow_mod(match_fields, actions, command=ofp.OFPFC_ADD,
     :return: initialized ofp_flow_mod object
     """
     instructions = [
-        ofp.ofp_instruction(
-            type=ofp.OFPIT_APPLY_ACTIONS,
-            actions=ofp.ofp_instruction_actions(actions=actions)
+        voltha__protos_dot_openflow__13__pb2.ofp_instruction(
+            type=voltha__protos_dot_openflow__13__pb2.OFPIT_APPLY_ACTIONS,
+            actions=voltha__protos_dot_openflow__13__pb2.ofp_instruction_actions(actions=actions)
         )
     ]
     if next_table_id is not None:
-        instructions.append(ofp.ofp_instruction(
-            type=ofp.OFPIT_GOTO_TABLE,
-            goto_table=ofp.ofp_instruction_goto_table(table_id=next_table_id)
+        instructions.append(voltha__protos_dot_openflow__13__pb2.ofp_instruction(
+            type=voltha__protos_dot_openflow__13__pb2.OFPIT_GOTO_TABLE,
+            goto_table=voltha__protos_dot_openflow__13__pb2.ofp_instruction_goto_table(table_id=next_table_id)
         ))
 
-    return ofp.ofp_flow_mod(
+    return voltha__protos_dot_openflow__13__pb2.ofp_flow_mod(
         command=command,
-        match=ofp.ofp_match(
-            type=ofp.OFPMT_OXM,
+        match=voltha__protos_dot_openflow__13__pb2.ofp_match(
+            type=voltha__protos_dot_openflow__13__pb2.OFPMT_OXM,
             oxm_fields=[
-                ofp.ofp_oxm_field(
-                    oxm_class=ofp.OFPXMC_OPENFLOW_BASIC,
+                voltha__protos_dot_openflow__13__pb2.ofp_oxm_field(
+                    oxm_class=voltha__protos_dot_openflow__13__pb2.OFPXMC_OPENFLOW_BASIC,
                     ofb_field=field
                 ) for field in match_fields
             ]
@@ -567,10 +567,10 @@ def mk_simple_flow_mod(match_fields, actions, command=ofp.OFPFC_ADD,
     )
 
 
-def mk_multicast_group_mod(group_id, buckets, command=ofp.OFPGC_ADD):
-    mc_group = ofp.ofp_group_mod(
+def mk_multicast_group_mod(group_id, buckets, command=voltha__protos_dot_openflow__13__pb2.OFPGC_ADD):
+    mc_group = voltha__protos_dot_openflow__13__pb2.ofp_group_mod(
         command=command,
-        type=ofp.OFPGT_ALL,
+        type=voltha__protos_dot_openflow__13__pb2.OFPGT_ALL,
         group_id=group_id,
         buckets=buckets
     )
@@ -593,7 +593,7 @@ def hash_flow_stats(flow):
 
 
 def flow_stats_entry_from_flow_mod_message(mod):
-    flow = ofp.ofp_flow_stats(
+    flow = voltha__protos_dot_openflow__13__pb2.ofp_flow_stats(
         table_id=mod.table_id,
         priority=mod.priority,
         idle_timeout=mod.idle_timeout,
@@ -608,13 +608,13 @@ def flow_stats_entry_from_flow_mod_message(mod):
 
 
 def group_entry_from_group_mod(mod):
-    entry = ofp.ofp_group_entry(
-        desc=ofp.ofp_group_desc(
+    entry = voltha__protos_dot_openflow__13__pb2.ofp_group_entry(
+        desc=voltha__protos_dot_openflow__13__pb2.ofp_group_desc(
             type=mod.type,
             group_id=mod.group_id,
             buckets=mod.buckets
         ),
-        stats=ofp.ofp_group_stats(
+        stats=voltha__protos_dot_openflow__13__pb2.ofp_group_stats(
             group_id=mod.group_id
             # TODO do we need to instantiate bucket bins?
         )

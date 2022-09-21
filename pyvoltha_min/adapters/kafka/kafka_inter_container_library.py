@@ -682,7 +682,8 @@ class IKafkaMessagingProxy:
                 async_span = None
 
             d = self.send_kafka_message(to_topic, request, async_span)
-
+            if d is not None:
+                return
             if self.tx_stats:
                 def successful(results, rpc_name, start):
                     # Update statistic at this level

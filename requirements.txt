@@ -9,7 +9,11 @@ netifaces       == 0.10.9
 protobuf        == 3.17.3
 structlog       == 21.1.0
 txaioetcd       == 18.10.2
-voltha-protos   == 4.2.0
+#voltha-protos   == 4.2.0
+
+grpcio-tools            ==1.40.0
+grpcio                  ==1.40.0
+googleapis-common-protos==1.53.0
 
 # Log correlation
 jaeger-client   == 4.4.0
